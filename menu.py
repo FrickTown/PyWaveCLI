@@ -84,6 +84,7 @@ class MenuEntry():
             fg = self.colors["highlitFg"]
 
         padOut = [" " for _ in range((self.parent.minWidth) - len(self.getFunction()))]
-        idx = f"{self.parent.menuEntries.index(self) + 1}. "
-        out = [self.parent.decorations.get("row")[0]] + [" " for _ in range(self.parent.hPadding)] + list(idx) + list((self.getFunction())) + padOut + [" " for _ in range(self.parent.hPadding)] + [self.parent.decorations.get("row")[-1]]
+        idx = list(f"{self.parent.menuEntries.index(self) + 1}. ")
+        idx = list(map(lambda x: self.wave.termColor + x, idx))
+        out = [self.parent.decorations.get("row")[0]] + [" " for _ in range(self.parent.hPadding)] + idx + list((self.getFunction())) + padOut + [" " for _ in range(self.parent.hPadding)] + [self.colors["normal"] + self.parent.decorations.get("row")[-1]]
         return out

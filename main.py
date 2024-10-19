@@ -188,8 +188,9 @@ def main():
     
     term.addGraphspace(Graphspace(term, term.width, term.height-1, 10, 10, 1/16))
 
-    term.graphspaces[0].addWave(Wave("math.sin(x) * (amp * math.sin(shift))", term.aqua, {"shift": {"value": 1, "incr": 1/10}, "amp": {"value": 5, "incr": 0}}))
+    term.graphspaces[0].addWave(Wave("math.sin(x - shift) * (amp * math.sin(shift))", term.aqua, {"shift": {"value": 1, "incr": 1/10}, "amp": {"value": 5, "incr": 0}}))
     term.graphspaces[0].addWave(Wave("math.sin(x + shift) * (amp * math.sin(shift))", term.bright_yellow, {"shift": {"value": 10, "incr": 1/10}, "amp": {"value": 7, "incr": 0}}))
+    term.graphspaces[0].addWave(Wave("math.sin(2 * x + shift) * (amp * math.sin(shift))", term.bright_red, {"shift": {"value": 10, "incr": 1/3}, "amp": {"value": 2, "incr": 0}}))
     with term.cbreak():
         val = ""
         while val.lower() != "q":
