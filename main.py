@@ -6,14 +6,10 @@ import math
 class TerminalSpace(Terminal):
     buffer: list[list[str]] = []
     graphspaces: list[Graphspace] = []
-    showMenu: bool = False
-    menu: menu.Menu = None
 
     def __init__(self, kind = None, stream = None, force_styling = False):
         super().__init__(kind, stream, force_styling)
         self.buffer = [[" " for _ in range(self.width)] for _ in range(self.height-1)]
-        self.menu = menu.Menu(self)
-        self.menu.generateMenu()
     
     def render(self):
         """
@@ -24,10 +20,6 @@ class TerminalSpace(Terminal):
             for idx, id in enumerate(graphspace.buffer):
                 self.buffer[idx] = id
             graphspace.clearBuffer()
-        
-        if(self.showMenu):
-            for idx, id in enumerate(self.menu.buffer):
-                self.buffer[idx+1] = id
 
         # Render menu info in top left corner last
         menubuffer = [self.underline + x + self.normal for x in list("[Menu: M]")]
@@ -55,7 +47,7 @@ class TerminalSpace(Terminal):
                 self.move_left(-self.width)
                 print(self.move_down, end="")        
 
-    def printGraphSpace(self, xPos: int, yPos: int, graphspace: Graphspace | Menu):
+    def printGraphSpace(self, xPos: int, yPos: int, graphspace: Graphspace | menu.Menu):
         """
         Unused method for overriding the full frame render and printing a graph space directly to the terminal.
         Arguments:
@@ -74,6 +66,8 @@ class TerminalSpace(Terminal):
 class Graphspace():
     waves: list[Wave] = []
     buffer: list[list[str]] = []
+    showMenu: bool = False
+    menu: menu.Menu = None
 
     def __init__(self, parent: TerminalSpace, xCellCount: int, yCellCount: int, xRange:float, yRange: float, stepSize: float):
         self.parent = parent
@@ -83,6 +77,7 @@ class Graphspace():
         self.yRange = yRange
         self.stepSize = stepSize
         self.clearBuffer()
+        self.menu = menu.Menu(self)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
@@ -104,6 +99,8 @@ class Graphspace():
             wave: The wave to add
         """
         self.waves.append(wave)
+        self.menu.addEntry(wave)
+        self.menu.generateMenu()
 
     def clearBuffer(self):
         # Reset the graphics buffer
@@ -112,6 +109,10 @@ class Graphspace():
     def renderFrame(self):
         self.printUIToBuffer()
         self.printWaves()
+        if(self.showMenu):
+            for rowIdx, rowVal in enumerate(self.menu.buffer):
+                for colIdx, colVal in enumerate(rowVal):
+                    self.buffer[rowIdx+1][colIdx] = colVal
         for wave in self.waves:
             wave.updateVariables()
     
@@ -188,12 +189,12 @@ def main():
     term.addGraphspace(Graphspace(term, term.width, term.height-1, 10, 10, 1/16))
 
     term.graphspaces[0].addWave(Wave("math.sin(x) * (amp * math.sin(shift))", term.aqua, {"shift": {"value": 1, "incr": 1/10}, "amp": {"value": 5, "incr": 0}}))
-    term.graphspaces[0].addWave(Wave("math.sin(x + shift) * (amp * math.sin(shift))", term.bright_yellow, {"shift": {"value": 10, "incr": 1/10}, "amp": {"value": 5, "incr": 0}}))
+    term.graphspaces[0].addWave(Wave("math.sin(x + shift) * (amp * math.sin(shift))", term.bright_yellow, {"shift": {"value": 10, "incr": 1/10}, "amp": {"value": 7, "incr": 0}}))
     with term.cbreak():
         val = ""
         while val.lower() != "q":
             if(val.lower() == "m"):
-                term.showMenu = not term.showMenu
+                term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
             term.render()
             val = term.inkey(timeout=0.02)
 
