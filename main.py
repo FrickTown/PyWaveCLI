@@ -26,9 +26,8 @@ class TerminalSpace(Terminal):
             graphspace.clearBuffer()
         
         if(self.showMenu):
-            self.menu.generateMenu()
             for idx, id in enumerate(self.menu.buffer):
-                self.buffer[idx] = id
+                self.buffer[idx+1] = id
 
         # Render menu info in top left corner last
         menubuffer = [self.underline + x + self.normal for x in list("[Menu: M]")]
