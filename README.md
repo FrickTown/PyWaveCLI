@@ -4,7 +4,7 @@
 
 
 PyWaveCLI is a python-based CLI application that allows for mathematical plotting in the terminal.
-It is stable amd functional but currently under very heavy development.
+It is stable and functional but currently under very heavy development.
 
 ## Requirements
 - PyWaveCLI depends on [**Blessed**](https://pypi.org/project/blessed/), which you can install with the command
