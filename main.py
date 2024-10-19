@@ -1,18 +1,18 @@
 from __future__ import annotations
 from blessed import Terminal
-from menu import Menu
+import menu
 import math
 
 class TerminalSpace(Terminal):
     buffer: list[list[str]] = []
     graphspaces: list[Graphspace] = []
     showMenu: bool = False
-    menu: Menu = None
+    menu: menu.Menu = None
 
     def __init__(self, kind = None, stream = None, force_styling = False):
         super().__init__(kind, stream, force_styling)
         self.buffer = [[" " for _ in range(self.width)] for _ in range(self.height-1)]
-        self.menu = Menu()
+        self.menu = menu.Menu(self)
         self.menu.generateMenu()
     
     def render(self):
@@ -26,7 +26,9 @@ class TerminalSpace(Terminal):
             graphspace.clearBuffer()
         
         if(self.showMenu):
-            self.printGraphSpace(0, 1, self.menu)
+            self.menu.generateMenu()
+            for idx, id in enumerate(self.menu.buffer):
+                self.buffer[idx] = id
 
         # Render menu info in top left corner last
         menubuffer = [self.underline + x + self.normal for x in list("[Menu: M]")]
@@ -69,6 +71,7 @@ class TerminalSpace(Terminal):
                 self.move_left(-self.width)
                 print(self.move_down, end="")
     
+
 class Graphspace():
     waves: list[Wave] = []
     buffer: list[list[str]] = []

@@ -1,7 +1,7 @@
-import M6_Projekt.rewrite
+import main
 
 class Menu():
-    buffer: list[list[str]] = [[]]
+    buffer: list[list[str]] = []
     minWidth = 10
     minHeight = 15
 
@@ -11,11 +11,11 @@ class Menu():
         "bot": ["┗"] + ["━" for _ in range(minWidth)] + ["┛"],
     }
 
-    def __init__(self, termSpace: TerminalSpace):
+    def __init__(self, termSpace: main.TerminalSpace):
         self.termSpace = termSpace
     
     def generateMenu(self):
-        self.buffer[0] = self.decorations.get("top")[::]
-        self.buffer[1] = self.decorations.get("row")[::]
-        self.buffer[2] = self.decorations.get("bot")[::]
+        self.buffer.append(self.decorations.get("top")[::])
+        self.buffer.append(self.decorations.get("row")[::])
+        self.buffer.append(self.decorations.get("bot")[::])
     
