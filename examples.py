@@ -3,7 +3,7 @@ import math
 
 def addWaves(term: TerminalSpace):
     # Create a new graphspace in terminalspace "term", 
-    # with width and height of the terminal, 
+    # with width and height of the terminal (height -1 to avoid terminal having to scroll for), 
     # with an xRange of -10 to 10 and an yRange of -10 to 10, 
     # and with a resolution of 32 points per cell (Should always be power of twos i.e. (1/2^n) )
     term.addGraphspace(Graphspace(term, term.width, term.height, 10, 10, 1/32))

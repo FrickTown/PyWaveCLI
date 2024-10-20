@@ -26,7 +26,7 @@ class TerminalSpace(Terminal):
         for idx, id in enumerate(menubuffer):
             self.buffer[0][idx] = id
         
-        self.printBuffer()
+        self.printBufferToTerminal()
 
     def addGraphspace(self, graphspace: Graphspace):
         """
@@ -36,7 +36,7 @@ class TerminalSpace(Terminal):
         """
         self.graphspaces.append(graphspace)
     
-    def printBuffer(self):
+    def printBufferToTerminal(self):
         """
         Render the TerminalSpace's buffer to the terminal. To be called only when the frame has been fully rendered to the buffer.
         """
@@ -149,10 +149,24 @@ class Graphspace():
         self.buffer[round((height)/2)][round(width/2)] = "+"
 
         # Print the legend
-        #buffer[1][round(width/2) - len(str(yScale))] = str(yScale)
-        #buffer[len(buffer)-2][round(width/2) - len(str(-yScale))] = str(-yScale)
-        #buffer[round(height/2)][0] = str(xScale)
-        #buffer[round(height/2)][width-len(str(-xScale))] = str(-xScale)
+        rangeS = str(self.yRange) # Get yRange as a string
+        rangeChars = list(rangeS) # Turn the string into a list of chars
+        legendPadding = 1 # Allow for padding (So that the value is not directly on the edge of the screen)
+        xStart = round(width/2) - round(len(rangeS) / 2) # Find out where we're going to start mapping
+        for idx, x in enumerate(range(xStart, xStart + len(rangeS))): # Map the values of rangeChars onto the GraphSpace buffer
+            self.buffer[1 + legendPadding][x] = rangeChars[idx]
+            self.buffer[-(1 + legendPadding)][x] = rangeChars[idx]
+        self.buffer[-(1 + legendPadding)][xStart-1] = '-' # Remember negative sign
+
+        rangeS = str(self.xRange) # Get xRange as a string
+        rangeChars = list(rangeS) # Turn the string into a list of chars
+        xStart1 = 1 # Decide the x coordinate for the negative xRange string
+        xStart2 = width - len(rangeChars) # Decide the x coordinate for the positive xRange string
+        yVal = round(height/2) + 1 # (Change to - 1 to place text above the x-axis) (or 0 to place *on* the x-axis)
+        for idx, x in enumerate(range(0, len(rangeS))): # Map the values of rangeChars onto the GraphSpace buffer
+            self.buffer[yVal][xStart1 + x] = rangeChars[idx]
+            self.buffer[yVal][xStart2 + x] = rangeChars[idx]
+        self.buffer[yVal][xStart1-1] = '-' # Remember negative sign
         
 
 class Wave():
