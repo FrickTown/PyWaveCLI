@@ -27,7 +27,7 @@ After this you can run the program with
 
     python main.py
 
-To edit the example waves, take a look at the `main()` function.
+To edit the example waves, take a look at the `example.py` module.
 A wave can be added by copying one of the lines preceeding with `term.graphspaces[0].addWave` and modifying it.
 If you wish to understand further, I've documented the code a little bit to help you.
 ### TODO: Add more detailed information
