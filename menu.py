@@ -33,6 +33,7 @@ class Menu():
             if(len(func) > self.minWidth):
                 self.minWidth = len(func)
 
+        # Generate the non-menu entry rows
         self.decorations: dict = {
             "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2 + self.idxPadding)] + ["┓"],
             "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2 + self.idxPadding)] + ["┃"],
@@ -40,16 +41,23 @@ class Menu():
         }
 
 
-        # Print the top
-        self.buffer.append(self.decorations.get("top")[::])
         # Print the rows
-        for _ in range(self.vPadding):
+        
+        self.buffer.append(self.decorations.get("top")[::])     # Print the top
+
+        for _ in range(self.vPadding):                          # Top padding
             self.buffer.append(self.decorations.get("row")[::])
-        for menuEntry in self.menuEntries:
+        
+        for menuEntry in self.menuEntries:                      # Get the unique rows by generating a row for each menu entry
             self.buffer.append(menuEntry.getMenuRow())
-        for _ in range(self.vPadding):
+
+        for _ in range(self.vPadding):                          # Bottom padding
             self.buffer.append(self.decorations.get("row")[::])
-        self.buffer.append(self.decorations.get("bot")[::])
+
+        self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
+    
+    def select(self, change: int):
+        self.activeIndex = (self.activeIndex + change) % (len(self.menuEntries - 1))
 
 class MenuEntry():
     def __init__(self, menu: Menu, wave: main.Wave):
@@ -62,9 +70,10 @@ class MenuEntry():
             "unselectedFg": self.parent.graphSpace.parent.white,
             "highlitBg": self.parent.graphSpace.parent.on_white,
             "highlitFg": self.parent.graphSpace.parent.black,
+            "underline": self.parent.graphSpace.parent.underline,
             "normal": self.parent.graphSpace.parent.normal
         }
-        self.active = False
+        self.active = True
         self.selected = False
     
     def getFunction(self):
@@ -86,5 +95,8 @@ class MenuEntry():
         padOut = [" " for _ in range((self.parent.minWidth) - len(self.getFunction()))]
         idx = list(f"{self.parent.menuEntries.index(self) + 1}. ")
         idx = list(map(lambda x: self.wave.termColor + x, idx))
-        out = [self.parent.decorations.get("row")[0]] + [" " for _ in range(self.parent.hPadding)] + idx + list((self.getFunction())) + padOut + [" " for _ in range(self.parent.hPadding)] + [self.colors["normal"] + self.parent.decorations.get("row")[-1]]
+        func = list((self.getFunction()))
+        func[0] = (self.colors["underline"] if self.active else "") + func[0]
+        func[-1] = func[-1] + self.colors["normal"]
+        out = [self.parent.decorations.get("row")[0]] + [" " for _ in range(self.parent.hPadding)] + idx + func + padOut + [" " for _ in range(self.parent.hPadding)] + [self.colors["normal"] + self.parent.decorations.get("row")[-1]]
         return out
