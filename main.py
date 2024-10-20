@@ -15,7 +15,7 @@ class TerminalSpace(Terminal):
         """
         Render a full frame to the TerminalSpace's buffer by rendering each graphspace and mapping them
         """
-        for graphspace in self.graphspaces:
+        for gSpaceID, graphspace in enumerate(self.graphspaces, 1):
             graphspace.renderFrame()
             for idx, id in enumerate(graphspace.buffer):
                 self.buffer[idx] = id
@@ -72,7 +72,7 @@ class Graphspace():
     def __init__(self, parent: TerminalSpace, xCellCount: int, yCellCount: int, xRange:float, yRange: float, stepSize: float):
         self.parent = parent
         self.xCellCount = xCellCount
-        self.yCellCount = yCellCount
+        self.yCellCount = yCellCount if (yCellCount % 2 != 0) else yCellCount - 1
         self.xRange = xRange
         self.yRange = yRange
         self.stepSize = stepSize
@@ -168,8 +168,8 @@ class Wave():
         self.asFunction = eval(self.lambdafied)
     
     def getY(self, x):
-        vars = [x] + [l[1]["value"] for l in self.av.items()]
-        return self.asFunction(*vars)
+        vars = [x] + [l[1]["value"] for l in self.av.items()] # Fetch the current value of x and each custom variable into a list of strings 
+        return self.asFunction(*vars) # Unpack the list into the lambda function to get the current value of the function
         
     
     def updateVariables(self):
@@ -186,18 +186,17 @@ def main():
     # Set cursor to 0,0, set theme, clear terminal
     print(f"{term.home}{term.gray100_on_gray1}{term.clear}")
     
-    term.addGraphspace(Graphspace(term, term.width, term.height-1, 10, 10, 1/16))
+    # Print example waves from a separate module (To avoid cluttering the code... even more than it already is...)
+    from examples import addWaves
+    addWaves(term)
 
-    term.graphspaces[0].addWave(Wave("math.sin(x - shift) * (amp * math.sin(shift))", term.aqua, {"shift": {"value": 1, "incr": 1/10}, "amp": {"value": 5, "incr": 0}}))
-    term.graphspaces[0].addWave(Wave("math.sin(x + shift) * (amp * math.sin(shift))", term.bright_yellow, {"shift": {"value": 10, "incr": 1/10}, "amp": {"value": 7, "incr": 0}}))
-    term.graphspaces[0].addWave(Wave("math.sin(2 * x + shift) * (amp * math.sin(shift))", term.bright_red, {"shift": {"value": 10, "incr": 1/3}, "amp": {"value": 2, "incr": 0}}))
     with term.cbreak():
         val = ""
         while val.lower() != "q":
             if(val.lower() == "m"):
                 term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
             term.render()
-            val = term.inkey(timeout=0.02)
+            val = term.inkey(timeout=0.01)
 
 if __name__ == "__main__":
     main()
