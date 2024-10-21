@@ -80,7 +80,7 @@ class Graphspace():
         self.stepSize = stepSize
         self.clearBuffer()
         self.menu = menu.Menu(self)
-        self.menu.addInfoEntry("Select: (Up/Down), Edit: (Space)", parent.blue)
+        self.menu.addInfoEntry("Option: (Up/Down), Select: (Enter), Back: (Backspace)", parent.blue)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
