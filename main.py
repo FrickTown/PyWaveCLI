@@ -2,6 +2,7 @@ from __future__ import annotations
 from blessed import Terminal
 import menu
 import math
+import signal
 
 class TerminalSpace(Terminal):
     buffer: list[list[str]] = []
@@ -11,6 +12,9 @@ class TerminalSpace(Terminal):
         super().__init__(kind, stream, force_styling)
         self.buffer = [[" " for _ in range(self.width)] for _ in range(self.height-1)]
     
+    def handleResize(sig, action, info):
+        pass
+
     def render(self):
         """
         Render a full frame to the TerminalSpace's buffer by rendering each graphspace and mapping them
@@ -31,7 +35,7 @@ class TerminalSpace(Terminal):
     def addGraphspace(self, graphspace: Graphspace):
         """
         Helper method for adding a Graphspace to the terminal context
-        Arguments:
+        keyword arguments:
             graphspace: The Graphspace to add
         """
         self.graphspaces.append(graphspace)
@@ -48,7 +52,7 @@ class TerminalSpace(Terminal):
     def printGraphSpace(self, xPos: int, yPos: int, graphspace: Graphspace | menu.Menu):
         """
         Unused method for overriding the full frame render and printing a graph space directly to the terminal.
-        Arguments:
+        arguments:
             xPos: the x position of the cell from which to start the rendering
             yPos: the y position of the cell from which to start the rendering
             graphspace: the graphspace to print
@@ -76,6 +80,7 @@ class Graphspace():
         self.stepSize = stepSize
         self.clearBuffer()
         self.menu = menu.Menu(self)
+        self.menu.addInfoEntry("Select: (Up/Down), Edit: (Space)", parent.blue)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
@@ -93,11 +98,11 @@ class Graphspace():
     
     def addWave(self, wave: Wave):
         """ Helper function for adding a wave function to the GraphSpace
-        Arguments:
+        keyword arguments:
             wave: The wave to add
         """
         self.waves.append(wave)
-        self.menu.addEntry(wave)
+        self.menu.addWaveEntry(wave)
         self.menu.generateMenu()
 
     def clearBuffer(self):
@@ -108,11 +113,16 @@ class Graphspace():
         self.printUIToBuffer()
         self.printWaves()
         if(self.showMenu):
-            for rowIdx, rowVal in enumerate(self.menu.buffer):
-                for colIdx, colVal in enumerate(rowVal):
-                    self.buffer[rowIdx+1][colIdx] = colVal
+            self.renderMenuToFrame(self.menu)
         for wave in self.waves:
             wave.updateVariables()
+
+    def renderMenuToFrame(self, menu: menu.Menu):
+        if(menu.activeSubmenu):
+            self.renderMenuToFrame(menu.activeSubmenu)
+        for rowIdx, rowVal in enumerate(menu.buffer):
+            for colIdx, colVal in enumerate(rowVal):
+                self.buffer[rowIdx+1][menu.xRenderOffset + colIdx] = colVal
     
     def printWaves(self):
         """Print all waves to the buffer for all values of x from -xRange to +xRange with a fixed stepSize."""
@@ -127,12 +137,9 @@ class Graphspace():
         """Print the x and y axis, as well as other GUI elements."""
         width = len(self.buffer[0])
         height = len(self.buffer)
-        # Print the name of the current wave
-        mockstring = "[Wave 1: f(x) = 0]"
-        #buffer[0][round(width/2) - int(len(mockstring)/2)] = term.underline + mockstring # Ensure it's centered by shifting left by half the length of the string
-
+        
         # Print the y-axis
-        for y in range(1,height):
+        for y in range(0,height):
             self.buffer[y][round(width/2)] = "|"
 
         # Print the x-axis
@@ -148,7 +155,7 @@ class Graphspace():
         legendPadding = 0                                               # Allow for padding (So that the value is not directly on the edge of the screen)
         xStart = round(width/2) - round(len(rangeS) / 2) - 1            # Find out where we're going to start mapping
         for idx, x in enumerate(range(xStart, xStart + len(rangeS))):   # Map the values of rangeChars onto the GraphSpace buffer
-            self.buffer[1 + legendPadding][x] = rangeChars[idx]
+            self.buffer[0 + legendPadding][x] = rangeChars[idx]
             self.buffer[-(1 + legendPadding)][x] = rangeChars[idx]
         self.buffer[-(1 + legendPadding)][xStart-1] = '-'               # Remember negative sign
 
@@ -164,25 +171,25 @@ class Graphspace():
         
 
 class Wave():
-    def __init__(self, func: str, termColor: str, additionalVars: dict[dict[str, "value": float, "incr": float]]):
+    def __init__(self, func: str, termColor: str, customVars: dict[dict[str, "value": float, "incr": float]]):
         self.func = func
         self.termColor = termColor
-        self.av = additionalVars
+        self.customVars = customVars
         lambdafied = "lambda x, "
-        for av in additionalVars.keys():
+        for av in customVars.keys():
             lambdafied += f"{av},"
         lambdafied = lambdafied[:-1] + ":"
         self.lambdafied = lambdafied + func
         self.asFunction = eval(self.lambdafied)
     
     def getY(self, x):
-        vars = [x] + [l[1]["value"] for l in self.av.items()] # Fetch the current value of x and each custom variable into a list of strings 
+        vars = [x] + [l[1]["value"] for l in self.customVars.items()] # Fetch the current value of x and each custom variable into a list of strings 
         return self.asFunction(*vars) # Unpack the list into the lambda function to get the current value of the function
         
     
     def updateVariables(self):
-        for key in self.av.keys():
-            self.av[key].update({"value": self.av[key]["value"] + self.av[key]["incr"]})
+        for key in self.customVars.keys():
+            self.customVars[key].update({"value": self.customVars[key]["value"] + self.customVars[key]["incr"]})
 
     def getFunc(self):
         return self.func()
@@ -190,7 +197,7 @@ class Wave():
 
 def main():
     term = TerminalSpace()
- 
+    signal.signal(signal.SIGWINCH, term.handleResize)
     # Set cursor to 0,0, set theme, clear terminal
     print(f"{term.home}{term.gray100_on_gray1}{term.clear}")
     
@@ -203,6 +210,9 @@ def main():
         while val.lower() != "q":
             if(val.lower() == "m"):
                 term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
+            if(term.graphspaces[0].showMenu and val.name):
+                term.graphspaces[0].menu.handleInput(val.name)
+
             term.render()
             val = term.inkey(timeout=0.01)
 
