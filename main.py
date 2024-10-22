@@ -1,6 +1,12 @@
+"""
+[PyWaveCLI Core]
+main.py -- The core for terminal interfacing, graphing logic and rendering logic.
+Author: FrickTown (https://github.com/FrickTown/)
+"""
 from __future__ import annotations
-from blessed import Terminal
+from blessed import Terminal, keyboard
 import menu
+import copy
 import math
 import signal
 
@@ -26,7 +32,7 @@ class TerminalSpace(Terminal):
             graphspace.clearBuffer()
 
         # Render menu info in top left corner last
-        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M]")]
+        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M] | [Quit: Q]")]
         for idx, id in enumerate(menubuffer):
             self.buffer[0][idx] = id
         
@@ -79,18 +85,19 @@ class Graphspace():
         self.yRange = yRange
         self.stepSize = stepSize
         self.clearBuffer()
-        self.menu = menu.Menu(self)
-        self.menu.addInfoEntry("Option: (Up/Down), Select: (Enter), Back: (Backspace)", parent.blue)
+        self.menu = menu.SelectionMenu(self)
+        self.menu.addInfoEntry("Navigation: [Option: (Up/Down), Select: (Enter), Back: (Backspace)]", parent.cadetblue1)
+        self.menu.addInfoEntry("Root Menu Controls: [Toggle Wave: (Tab), Reset Wave: (R)]", parent.plum)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
         xStepSize = (self.xRange * 2) / self.xCellCount
         xInCells = round(x / xStepSize)
-        xAdjusted = int((self.xCellCount / 2) + xInCells)
+        xAdjusted = int(round(self.xCellCount / 2) + xInCells)
 
         yStepSize = (self.yRange * 2)/(self.yCellCount)
         yInCells = round(y / yStepSize)
-        yAdjusted = int((self.yCellCount / 2) - yInCells)
+        yAdjusted = int(round((self.yCellCount / 2)) - yInCells)
 
         if (yAdjusted < 0 or yAdjusted >= self.yCellCount or xAdjusted < 0 or xAdjusted >= self.xCellCount):
             return None
@@ -122,13 +129,14 @@ class Graphspace():
             self.renderMenuToFrame(menu.activeSubmenu)
         for rowIdx, rowVal in enumerate(menu.buffer):
             for colIdx, colVal in enumerate(rowVal):
-                self.buffer[rowIdx+1][menu.xRenderOffset + colIdx] = colVal
+                self.buffer[menu.yRenderOffset + rowIdx+1][menu.xRenderOffset + colIdx] = colVal
     
     def printWaves(self):
         """Print all waves to the buffer for all values of x from -xRange to +xRange with a fixed stepSize."""
         x = -self.xRange
         while (x < self.xRange):
             for wave in self.waves:
+                if not wave.visible: continue
                 cellPos = self.cartesianToGraphspace(x, wave.getY(x))
                 if cellPos != None: self.buffer[cellPos[1]][cellPos[0]] = f"{wave.termColor}0{self.parent.normal}"
             x += self.stepSize
@@ -171,16 +179,18 @@ class Graphspace():
         
 
 class Wave():
-    def __init__(self, func: str, termColor: str, customVars: dict[dict[str, "value": float, "incr": float]]):
+    def __init__(self, func: str, termColor: str, customVars: dict[dict[str, "value": float, "incr": float]], visible: bool = True):
         self.func = func
         self.termColor = termColor
-        self.customVars = customVars
+        self.customVars: dict = customVars
+        self.originalVars: dict = copy.deepcopy(customVars)
         lambdafied = "lambda x, "
         for av in customVars.keys():
             lambdafied += f"{av},"
         lambdafied = lambdafied[:-1] + ":"
         self.lambdafied = lambdafied + func
         self.asFunction = eval(self.lambdafied)
+        self.visible = visible
     
     def getY(self, x):
         vars = [x] + [l[1]["value"] for l in self.customVars.items()] # Fetch the current value of x and each custom variable into a list of strings 
@@ -206,15 +216,16 @@ def main():
     addWaves(term)
 
     with term.cbreak():
-        val = ""
-        while val.lower() != "q":
-            if(val.lower() == "m"):
+        val = keyboard.Keystroke("")
+        while True:
+            if(val.lower() == "q" and type(term.graphspaces[0].menu.recursiveSubMenuFetch()) is not menu.InputMenu): break
+            if(val.lower() == "m" and type(term.graphspaces[0].menu.recursiveSubMenuFetch()) is not menu.InputMenu):
                 term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
-            if(term.graphspaces[0].showMenu and val.name):
-                term.graphspaces[0].menu.handleInput(val.name)
+            if(term.graphspaces[0].showMenu and val != ""):
+                term.graphspaces[0].menu.handleInput(val)
 
             term.render()
-            val = term.inkey(timeout=0.01)
+            val = term.inkey(timeout=0.005)
 
 if __name__ == "__main__":
     main()

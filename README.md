@@ -4,7 +4,7 @@
 
 
 PyWaveCLI is a python-based CLI application that allows for mathematical plotting in the terminal.
-It is stable and functional but currently under very heavy development.
+It is stable and functional but currently under very heavy development. All one-variable continuous functions seem to be working.
 
 ## Requirements
 - PyWaveCLI depends on [**Blessed**](https://pypi.org/project/blessed/), which you can install with the command
@@ -14,7 +14,7 @@ It is stable and functional but currently under very heavy development.
 - The terminal emulator [**Alacritty**](https://alacritty.org/) is highly recommended due to its formidable speed.
 
 - Additionally, I do also recommend that you set your **terminal's cursor color to be the same as the background color**. This is in order to avoid a lot of flickering that comes with rendering across the cells so rapidly. I've achieved this in Alacritty by modifying the config file `~/.alacritty.toml` as follows:
-```
+```toml
 [colors]
 cursor = { text = "CellBackground", cursor = "CellBackground" }
 ```
