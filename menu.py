@@ -79,12 +79,13 @@ class SelectionMenu(Menu):
         """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
         self.buffer = []
         # Determine the width and height of the menu
-        if(len(self.menuEntries) > self.minHeight): self.minHeight = len(self.menuEntries)
-        self.minWidth = len(self.menuEntries[0].getEntryText())
-        for menuEntry in self.menuEntries:
-            func = menuEntry.getEntryText()
-            if(len(func) > self.minWidth):
-                self.minWidth = len(func)
+        if(len(self.menuEntries) > 0):
+            if(len(self.menuEntries) > self.minHeight): self.minHeight = len(self.menuEntries)
+            self.minWidth = len(self.menuEntries[0].getEntryText())
+            for menuEntry in self.menuEntries:
+                func = menuEntry.getEntryText()
+                if(len(func) > self.minWidth):
+                    self.minWidth = len(func)
 
         # Generate the non-menu entry rows
         self.decorations: dict = {
