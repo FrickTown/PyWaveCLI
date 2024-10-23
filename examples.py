@@ -28,11 +28,19 @@ def addWaves(term: TerminalSpace):
         "aMod": {"value": 0, "incr": math.pi/100}
         }))
     # Very cool wave form that incrases in amplitude from x, but also is also dependent on a sine function.
-    term.graphspaces[0].addWave(Wave("math.sin(x + shift) * (amp * math.sin(aMod + x) * x)", term.bright_red, {
+    term.graphspaces[0].addWave(Wave("math.sin(x + (math.sin(shift))) * (amp * math.sin(aMod + x) * x)", term.bright_red, {
         "shift": {"value": math.pi, "incr": math.pi/45}, 
         "amp": {"value": 1, "incr": 0},
         "aMod": {"value": 0, "incr": math.pi/30}
         }))
+    
+    # Previous wave but shifted one period
+    term.graphspaces[0].addWave(Wave("math.sin(x + (math.sin(shift)) + math.pi) * (amp * math.sin(aMod + x) * x)", term.slateblue, {
+        "shift": {"value": math.pi, "incr": math.pi/45}, 
+        "amp": {"value": 1, "incr": 0},
+        "aMod": {"value": 0, "incr": math.pi/30}
+        }, visible=False))
+    
     # Tan wave demo
     term.graphspaces[0].addWave(Wave("math.tan(x + shift)", term.bright_magenta, {
         "shift": {"value": math.pi, "incr": math.pi/45},
