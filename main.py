@@ -5,6 +5,7 @@ Author: FrickTown (https://github.com/FrickTown/)
 """
 from __future__ import annotations
 from blessed import Terminal, keyboard
+import os
 import menu
 import copy
 import math
@@ -52,9 +53,8 @@ class TerminalSpace(Terminal):
             for y in range(len(self.buffer)):
                 for x in range(len(self.buffer[y])):
                     print(self.buffer[y][x], end="")
-                self.move_left(-self.width)
-                print(self.move_down, end="")        
-
+                print("", end="\n")
+     
     def printGraphSpace(self, xPos: int, yPos: int, graphspace: Graphspace | menu.Menu):
         """
         Unused method for overriding the full frame render and printing a graph space directly to the terminal.
@@ -65,7 +65,7 @@ class TerminalSpace(Terminal):
         """
         with self.location(xPos, yPos):
             for y in range(len(graphspace.buffer)):
-                for x in range(len(graphspace.buffer[y])):
+                for x in range(len(graphspace.buffer[y])-1):
                     print(graphspace.buffer[y][x], end="")
                 self.move_left(-self.width)
                 print(self.move_down, end="")
@@ -207,7 +207,8 @@ class Wave():
 
 def main():
     term = TerminalSpace()
-    signal.signal(signal.SIGWINCH, term.handleResize)
+    if(os.name != "nt"): # Resize event handler only available on Linux / MacOS
+        signal.signal(signal.SIGWINCH, term.handleResize)
     # Set cursor to 0,0, set theme, clear terminal
     print(f"{term.home}{term.gray100_on_gray1}{term.clear}")
     
