@@ -316,7 +316,7 @@ class ArgEntry(SelectableEntry):
         self.argRow = wave.customVars[argName]
     
     def getEntryText(self):
-        return f"{self.argName}: {self.argRow["incr"]}"
+        return f"{self.argName}: {self.argRow['incr']}"
 
     def getMenuRow(self):
         padOut = [" " for _ in range((self.parent.minWidth) - len(self.getEntryText()))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
@@ -337,7 +337,7 @@ class InputMenu(Menu):
     buffer: list[list[str]] = []
     
     # Style values
-    minWidth: int = 15
+    minWidth: int = 20
     minHeight: int = 30
     hPadding: int = 2
     vPadding: int = 1
@@ -399,6 +399,7 @@ class InputMenu(Menu):
             self.buffer.append(self.decorations.get("row")[::])
 
         self.buffer.append(self.titleAsBuffer)
+        self.buffer.append(self.createRowFromString("Confirm: (Enter), Cancel: (Escape)", self.graphSpace.parent.blue))
         self.buffer.append(self.decorations.get("row")[::])
         self.buffer.append(self.generateMenuRowFromList(self.valueBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
 
@@ -433,6 +434,11 @@ class InputMenu(Menu):
                 if(type(self.getSelectedEntry()) is WaveEntry):
                     sel: WaveEntry = self.getSelectedEntry()
                     sel.wave.visible = not sel.wave.visible
+            elif(keyname == "KEY_ESCAPE"):
+                self.valueBuffer = []
+                self.invalid = False
+                self.generateMenu()
+                self.parentMenu.toggleSubMenu()
             return
         val = keyval.lower()
         if(keyval.isprintable()):
