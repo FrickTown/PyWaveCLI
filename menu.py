@@ -73,10 +73,12 @@ class SelectionMenu(Menu):
         super().__init__(graphSpace, name, parentMenu)
         self.menuEntries = []
         if(parentMenu):
-            self.xRenderOffset = parentMenu.xRenderOffset + len(parentMenu.buffer[0]) + 1
+            self.xRenderOffset = parentMenu.xRenderOffset + len(parentMenu.buffer[0])
 
     def generateMenu(self):
         """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
+        if(self.parentMenu):
+            self.xRenderOffset = self.parentMenu.xRenderOffset + len(self.parentMenu.buffer[0])
         self.buffer = []
         # Determine the width and height of the menu
         if(len(self.menuEntries) > 0):
@@ -350,7 +352,7 @@ class InputMenu(Menu):
     def __init__(self, graphSpace: main.Graphspace, name: str, parentMenu: SelectionMenu, keyName: str):
         super().__init__(graphSpace, name, parentMenu)
         self.keyName = keyName
-        self.title = f"Input value for key ({keyName}):"
+        self.title = f"Input increment value for key ({keyName}):"
         self.minWidth = len(self.title) + self.hPadding
         self.parentEntry = parentMenu.getSelectedEntry()
         self.valueBuffer = []
@@ -407,6 +409,9 @@ class InputMenu(Menu):
             self.buffer.append(self.decorations.get("row")[::])
 
         self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
+
+        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
+        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(len(self.buffer)/2)
     
     def handleInput(self, keyval: keyboard.Keystroke):
         if(keyval.name):
