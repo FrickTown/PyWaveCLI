@@ -386,7 +386,7 @@ class ArgEntry(SelectableEntry):
 
     def openInputWindow(self, title: str = ""):
         super().openInputWindow(title)
-        self.inputWindow = InputWindow(self, "Enter increment value for " + self.argName + ":", "incr")
+        self.inputWindow = InputWindow(self, "Enter increment value for " + self.argName + ":", "incr".center(4))
         self.inputWindow.setValueBuffer(list(str(self.wave.customVars[self.argName]["incr"])))
 
 class InputWindow(Menu):
@@ -411,12 +411,8 @@ class InputWindow(Menu):
         self.args = args
         self.title = textPrompt
         self.valueBuffer: list[str] = []
-        self.minWidth = len(self.title) + self.hPadding
-        self.decorations: dict = {
-            "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┓"],
-            "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2)] + ["┃"],
-            "bot": ["┗"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┛"],
-        }
+        self.minWidth = len("| Confirm: (Enter) | Cancel: (Escape) |") + self.hPadding
+        self.generateDecorations()
         self.parentMenu: SelectionMenu = parentEntry.parent
         self.graphSpace: main.Graphspace = self.parentMenu.graphSpace
         self.parentEntry: SelectableEntry = parentEntry
@@ -425,6 +421,13 @@ class InputWindow(Menu):
         self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(self.minHeight/2) + self.vPadding
         self.invalid = False
     
+    def generateDecorations(self):
+        self.decorations = {
+            "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┓"],
+            "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2)] + ["┃"],
+            "bot": ["┗"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┛"],
+        }
+
     def setValueBuffer(self, buffer: list[str]):
         self.valueBuffer = buffer
         self.generateMenu()
@@ -455,6 +458,12 @@ class InputWindow(Menu):
     def generateMenu(self):
         """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
         self.buffer = []
+
+        if(len(self.valueBuffer) > self.minWidth):
+            self.minWidth = len(self.valueBuffer) + self.hPadding
+            self.generateDecorations()
+            self.titleAsBuffer = self.createRowFromString(self.title, self.graphSpace.parent.bright_magenta)
+
         # Print the rows
         self.buffer.append(self.decorations.get("top")[::])     # Print the top
 
@@ -462,6 +471,7 @@ class InputWindow(Menu):
             self.buffer.append(self.decorations.get("row")[::])
 
         self.buffer.append(self.titleAsBuffer)
+        self.buffer.append(self.createRowFromString("| Confirm: (Enter) | Cancel: (Escape) |".center(4), self.graphSpace.parent.steelblue1))
         self.buffer.append(self.decorations.get("row")[::])
         self.buffer.append(self.generateMenuRowFromList(self.valueBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
 
