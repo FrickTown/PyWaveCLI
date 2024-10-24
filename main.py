@@ -11,6 +11,8 @@ import copy
 import math
 import signal
 
+FRAMERATE = 60 # Set maximum FPS (frames per second)
+
 class TerminalSpace(Terminal):
     buffer: list[list[str]] = []
     graphspaces: list[Graphspace] = []
@@ -86,8 +88,10 @@ class Graphspace():
         self.stepSize = stepSize
         self.clearBuffer()
         self.menu = menu.SelectionMenu(self)
-        self.menu.addInfoEntry("Navigation: [Option: (Up/Down), Select: (Enter), Back: (Backspace)]", parent.cadetblue1)
-        self.menu.addInfoEntry("Root Menu Controls: [Toggle Wave: (Tab), Reset Wave: (R)]", parent.plum)
+        self.menu.addInfoEntry("Navigation| Option: (Up/Down)  | Select: (Enter)  |", parent.cadetblue1)
+        self.menu.addInfoEntry("          | Back: (Backspace)  | Edit: (Spacebar) |", parent.cadetblue1)
+        self.menu.addInfoEntry("Wave Menu | Toggle Wave: (Tab) | Reset Wave: (R)  |", parent.steelblue1)
+        self.menu.addInfoEntry("", parent.normal)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
@@ -124,12 +128,16 @@ class Graphspace():
         for wave in self.waves:
             wave.updateVariables()
 
-    def renderMenuToFrame(self, menu: menu.Menu):
-        if(menu.activeSubmenu):
-            self.renderMenuToFrame(menu.activeSubmenu)
-        for rowIdx, rowVal in enumerate(menu.buffer):
+    def renderMenuToFrame(self, curMenu: menu.Menu):
+        if(curMenu.activeSubmenu):
+            self.renderMenuToFrame(curMenu.activeSubmenu)
+        for rowIdx, rowVal in enumerate(curMenu.buffer):
             for colIdx, colVal in enumerate(rowVal):
-                self.buffer[menu.yRenderOffset + rowIdx+1][menu.xRenderOffset + colIdx] = colVal
+                self.buffer[curMenu.yRenderOffset + rowIdx+1][curMenu.xRenderOffset + colIdx] = colVal
+        if(curMenu.inputWindowOverride):
+            men: menu.SelectionMenu = curMenu
+            self.renderMenuToFrame(men.getSelectedEntry().inputWindow)
+
     
     def printWaves(self):
         """Print all waves to the buffer for all values of x from -xRange to +xRange with a fixed stepSize."""
@@ -179,11 +187,13 @@ class Graphspace():
         
 
 class Wave():
+    """ Wave Class : Contains a function f(x) and methods to evaluate it."""
     def __init__(self, func: str, termColor: str, customVars: dict[dict[str, "value": float, "incr": float]], visible: bool = True):
         self.func = func
         self.termColor = termColor
         self.customVars: dict = customVars
         self.originalVars: dict = copy.deepcopy(customVars)
+        self.originalFunc = str(func)
         lambdafied = "lambda x, "
         for av in customVars.keys():
             lambdafied += f"{av},"
@@ -201,8 +211,51 @@ class Wave():
         for key in self.customVars.keys():
             self.customVars[key].update({"value": self.customVars[key]["value"] + self.customVars[key]["incr"]})
 
+    def resetWave(self):
+        self.func = str(self.originalFunc)
+        for var in self.originalVars.keys():
+            for key in self.originalVars[var]:
+                self.customVars[var][key] = self.originalVars[var][key]
+
+        lambdafied = "lambda x, "
+        for av in self.customVars.keys():
+            lambdafied += f"{av},"
+        lambdafied = lambdafied[:-1] + ":"
+        self.lambdafied = lambdafied + self.func
+        self.asFunction = eval(self.lambdafied)
+
     def getFunc(self):
         return self.func()
+    
+    def tryUpdateWaveFunction(self, newFunc: str, newVars: dict[str:dict[str:float]]) -> bool:
+        """Try to set a new wave function.
+
+        Args:
+            newFunc (str): The new function represented by a string
+            newVars (dict): The new (if any) variables supplied
+
+        Returns:
+            bool: If the new wave function is evaluatable by eval, returns True. Else False.
+        """
+        lambdafied = "lambda x "
+        for av in self.customVars.keys():
+            lambdafied += f",{av} "
+        lambdafied = lambdafied[:-1] + ":"
+        lambdafied = lambdafied + newFunc
+        try: 
+            asFunction = eval(lambdafied)
+            vars = [0] + [l[1]["value"] for l in self.customVars.items()]
+            tryCalling = asFunction(*vars)
+            tryCalling / 10
+            pass
+
+        except Exception as e:
+            return False
+        self.lambdafied = lambdafied
+        self.func = newFunc
+        self.asFunction = asFunction
+        return True
+
 
 
 def main():
@@ -219,14 +272,14 @@ def main():
     with term.cbreak():
         val = keyboard.Keystroke("")
         while True:
-            if(val.lower() == "q" and type(term.graphspaces[0].menu.recursiveSubMenuFetch()) is not menu.InputMenu): break
-            if(val.lower() == "m" and type(term.graphspaces[0].menu.recursiveSubMenuFetch()) is not menu.InputMenu):
+            if(val.lower() == "q" and not term.graphspaces[0].menu.recursiveSubMenuFetch().inputWindowOverride): break
+            if(val.lower() == "m" and not term.graphspaces[0].menu.recursiveSubMenuFetch().inputWindowOverride):
                 term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
             if(term.graphspaces[0].showMenu and val != ""):
                 term.graphspaces[0].menu.handleInput(val)
 
             term.render()
-            val = term.inkey(timeout=0.005)
+            val = term.inkey(timeout=(1/FRAMERATE))
         os.system("cls||clear")
 if __name__ == "__main__":
     main()

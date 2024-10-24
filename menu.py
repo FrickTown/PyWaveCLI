@@ -29,6 +29,9 @@ class Menu(ABC):
     uniqueName: str = None
     activeSubmenu: Menu = None
 
+    # InputWindow logic
+    inputWindowOverride: bool = False
+
     def __init__(self, graphSpace: main.Graphspace, name: str = None, parentMenu: Menu = None):
         self.graphSpace = graphSpace
         self.uniqueName = name
@@ -111,11 +114,14 @@ class SelectionMenu(Menu):
 
         self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
 
+        if(self.getSelectedEntry().inputWindow is not None):
+            self.getSelectedEntry().inputWindow.generateMenu()
+
     def getSelectableEntries(self):
         """Return a subset of the menu's entries containing all elements that can be selected"""
         return list(filter(lambda x: x.selectable, self.menuEntries))
     
-    def getSelectedEntry(self):
+    def getSelectedEntry(self) -> SelectableEntry:
         """Return the MenuEntry subclass object that is currently selected in the menu"""
         return self.menuEntries[self.activeIndex]
     
@@ -167,6 +173,10 @@ class SelectionMenu(Menu):
         newEntry.createSubMenu()
     
     def handleInput(self, keyval: keyboard.Keystroke):
+        # If an input window is open, pass the input along to it
+        if(self.inputWindowOverride):
+            self.getSelectedEntry().inputWindow.handleInput(keyval)
+            return
 
         # If this menu is displaying a submenu, pass the input along 'til it reaches its maximum depth
         if(self.activeSubmenu):
@@ -195,13 +205,12 @@ class SelectionMenu(Menu):
         
         if(keyval.lower() == "r"):
             if(type(self.getSelectedEntry()) is WaveEntry):
-                sel: WaveEntry = self.getSelectedEntry()
-                #orig = copy.deepcopy(sel.wave.originalVars)
-                #sel.wave.customVars.update(sel.wave.originalVars)
-                for var in sel.wave.originalVars.keys():
-                    for key in sel.wave.originalVars[var]:
-                        sel.wave.customVars[var][key] = sel.wave.originalVars[var][key]
+                wav: WaveEntry = self.getSelectedEntry()
+                wav.wave.resetWave()
                 self.generateMenu()
+        elif(keyval.lower() == " "):
+            self.getSelectedEntry().openInputWindow()
+            return
 
     def select(self, change: int):
         """Select a neighboring entry in the active menu
@@ -258,6 +267,7 @@ class MenuEntry(ABC):
         pass
 
 
+
 class InfoEntry(MenuEntry):
     def __init__(self, menu: Menu, info: str, color: str):
         super().__init__(menu)
@@ -272,15 +282,30 @@ class InfoEntry(MenuEntry):
 
 
 class SelectableEntry(MenuEntry):
-    subMenu = None
+    subMenu: Menu = None
+    inputWindow: InputWindow = None
 
     def __init__(self, menu: Menu):
         super().__init__(menu)
         self.selectable = True
 
+
+    def onInputWindowCancel(self):
+        self.inputWindow = None
+        self.parent.inputWindowOverride = False
+
+    @abstractmethod
+    def openInputWindow(self, title: str = ""):
+        self.parent.inputWindowOverride = True
+
     @abstractmethod
     def createSubMenu(self):
         pass
+
+    @abstractmethod
+    def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
+        pass
+    
 
 
 class WaveEntry(SelectableEntry):
@@ -309,6 +334,20 @@ class WaveEntry(SelectableEntry):
             self.subMenu.addArgEntry(self.wave, var)
         self.subMenu.generateMenu()
 
+    def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
+            if(not self.wave.tryUpdateWaveFunction(input, {})):
+                return False
+
+            self.parent.inputWindowOverride = False
+            self.inputWindow = None
+            self.parent.generateMenu()
+            return True
+    
+    def openInputWindow(self, title: str = ""):
+        super().openInputWindow(title)
+        self.inputWindow = InputWindow(self, "Enter a new function:")
+        self.inputWindow.setValueBuffer(list(self.wave.func))
+
 
 class ArgEntry(SelectableEntry):
     def __init__(self, menu: Menu, wave: main.Wave, argName: str):
@@ -331,12 +370,28 @@ class ArgEntry(SelectableEntry):
         return out
     
     def createSubMenu(self):
-        self.subMenu = InputMenu(self.parent.graphSpace, f"waveArgs{self.parent.getSelectableEntries().index(self)}", self.parent, self.argName)
-        self.subMenu.generateMenu()
+        pass
 
-class InputMenu(Menu):
+    def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
+        try:
+            tryParse = eval("lambda: "+ input)
+            newValue = tryParse()
+        except Exception:
+            return False
+        self.wave.customVars[self.argName][args[0]] = newValue
+        self.parent.inputWindowOverride = False
+        self.inputWindow = None
+        self.parent.generateMenu()
+        return True
+
+    def openInputWindow(self, title: str = ""):
+        super().openInputWindow(title)
+        self.inputWindow = InputWindow(self, "Enter increment value for " + self.argName + ":", "incr")
+        self.inputWindow.setValueBuffer(list(str(self.wave.customVars[self.argName]["incr"])))
+
+class InputWindow(Menu):
     # Frame buffer
-    buffer: list[list[str]] = []
+    buffer: list[list[str]] = [[]]
     
     # Style values
     minWidth: int = 20
@@ -349,24 +404,30 @@ class InputMenu(Menu):
     # Text value logic
     valueBuffer: list[str] = []
 
-    def __init__(self, graphSpace: main.Graphspace, name: str, parentMenu: SelectionMenu, keyName: str):
-        super().__init__(graphSpace, name, parentMenu)
-        self.keyName = keyName
-        self.title = f"Input increment value for key ({keyName}):"
+    title: str = ""
+    titleAsBuffer: list[str] = []
+
+    def __init__(self, parentEntry: SelectableEntry, textPrompt: str, *args):
+        self.args = args
+        self.title = textPrompt
+        self.valueBuffer: list[str] = []
         self.minWidth = len(self.title) + self.hPadding
-        self.parentEntry = parentMenu.getSelectedEntry()
-        self.valueBuffer = []
-        # Generate the vanity non-menu entry rows
         self.decorations: dict = {
             "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┓"],
             "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2)] + ["┃"],
             "bot": ["┗"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┛"],
         }
-        self.titleAsBuffer = self.createRowFromString(self.title, self.parentMenu.graphSpace.parent.gray100)
-        self.parentMenu: SelectionMenu = parentMenu
-        self.xRenderOffset = round(graphSpace.xCellCount / 2) - round(self.minWidth/2) - self.hPadding
-        self.yRenderOffset = round(graphSpace.yCellCount / 2) - round(self.minHeight/2) + self.vPadding
+        self.parentMenu: SelectionMenu = parentEntry.parent
+        self.graphSpace: main.Graphspace = self.parentMenu.graphSpace
+        self.parentEntry: SelectableEntry = parentEntry
+        self.titleAsBuffer = self.createRowFromString(textPrompt, self.graphSpace.parent.bright_magenta)
+        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(self.minWidth/2) - self.hPadding
+        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(self.minHeight/2) + self.vPadding
         self.invalid = False
+    
+    def setValueBuffer(self, buffer: list[str]):
+        self.valueBuffer = buffer
+        self.generateMenu()
 
     def createRowFromString(self, rowText: str, color: str):
         """ Create a properly formatted row that fits into the window, from a supplied string and color.
@@ -383,14 +444,14 @@ class InputMenu(Menu):
         rowList = list(map(lambda x: color + x, rowList))
         out = [self.decorations.get("row")[0]] + [" " for _ in range(self.hPadding)] + rowList + padOut + [" " for _ in range(self.hPadding)] + [self.graphSpace.parent.normal + self.decorations.get("row")[-1]]
         return out
-
+    
     def addToVal(self, char):
         self.valueBuffer.append(char)
     
     def remFromVal(self):
         if len(self.valueBuffer):
             self.valueBuffer.pop()
-    
+
     def generateMenu(self):
         """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
         self.buffer = []
@@ -401,7 +462,6 @@ class InputMenu(Menu):
             self.buffer.append(self.decorations.get("row")[::])
 
         self.buffer.append(self.titleAsBuffer)
-        self.buffer.append(self.createRowFromString("Confirm: (Enter), Cancel: (Escape)", self.graphSpace.parent.blue))
         self.buffer.append(self.decorations.get("row")[::])
         self.buffer.append(self.generateMenuRowFromList(self.valueBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
 
@@ -412,40 +472,25 @@ class InputMenu(Menu):
 
         self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
         self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(len(self.buffer)/2)
-    
+
     def handleInput(self, keyval: keyboard.Keystroke):
+        """Input handler for InputMenu. Checks for special keys, otherwise, passes it on to the value buffer. 
+        keyword arguments:
+            keyval -- The keystroke read from stdin
+        """
         if(keyval.name):
             keyname = keyval.name
             if(keyname == "KEY_ENTER"):
-                try:
-                   tryParse = eval("lambda: "+ ''.join(self.valueBuffer))
-                   newValue = tryParse()
-                except Exception:
-                    self.invalid = True
-                    self.generateMenu()
-                    return
-                cast: WaveEntry = self.parentEntry
-                cast.wave.customVars[self.keyName]["incr"] = newValue
-                self.invalid = False
-                self.generateMenu()
-                self.parentMenu.generateMenu()
-                self.parentMenu.toggleSubMenu()
-
+                    if(self.parentEntry.onInputWindowConfirm("".join(self.valueBuffer), self.args)):self.invalid = False
+                    else:self.invalid = True
             elif(keyname == "KEY_BACKSPACE"):
                 self.remFromVal()
                 self.invalid = False
-                self.generateMenu()
-            elif(keyname == "KEY_TAB"):
-                if(type(self.getSelectedEntry()) is WaveEntry):
-                    sel: WaveEntry = self.getSelectedEntry()
-                    sel.wave.visible = not sel.wave.visible
             elif(keyname == "KEY_ESCAPE"):
                 self.valueBuffer = []
                 self.invalid = False
-                self.generateMenu()
-                self.parentMenu.toggleSubMenu()
-            return
-        val = keyval.lower()
-        if(keyval.isprintable()):
-            self.addToVal(keyval)
-            self.generateMenu()
+                self.parentEntry.onInputWindowCancel()
+        elif(keyval.isprintable()):
+            self.invalid = False
+            self.addToVal(keyval.lower())
+        self.generateMenu()
