@@ -473,8 +473,7 @@ class InputWindow(Menu):
         self.buffer.append(self.titleAsBuffer)
         self.buffer.append(self.createRowFromString("| Confirm: (Enter) | Cancel: (Escape) |".center(4), self.graphSpace.parent.steelblue1))
         self.buffer.append(self.decorations.get("row")[::])
-        self.buffer.append(self.generateMenuRowFromList(self.valueBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
-
+        self.buffer.append(self.generateMenuRowFromList(self.valueBuffer + [self.graphSpace.parent.gray100 + "_"], self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
         for _ in range(self.vPadding):                          # Bottom padding
             self.buffer.append(self.decorations.get("row")[::])
 
