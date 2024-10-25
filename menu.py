@@ -403,6 +403,7 @@ class InputWindow(Menu):
 
     # Text value logic
     valueBuffer: list[str] = []
+    cursorPos: int = 0
 
     title: str = ""
     titleAsBuffer: list[str] = []
@@ -471,12 +472,18 @@ class InputWindow(Menu):
             self.buffer.append(self.decorations.get("row")[::])
 
         self.buffer.append(self.titleAsBuffer)
-        self.buffer.append(self.createRowFromString("| Confirm: (Enter) | Cancel: (Escape) |".center(4), self.graphSpace.parent.steelblue1))
         self.buffer.append(self.decorations.get("row")[::])
-        self.buffer.append(self.generateMenuRowFromList(self.valueBuffer + [self.graphSpace.parent.gray100 + "_"], self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
+        # Print the cursor
+        displayBuffer = self.valueBuffer[::]
+        if(self.cursorPos == 0):
+            displayBuffer.append(self.graphSpace.parent.gray100 + "_")
+        else:
+            displayBuffer.insert(self.cursorPos, self.graphSpace.parent.gray100 + "_")
+        self.buffer.append(self.generateMenuRowFromList(displayBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
         for _ in range(self.vPadding):                          # Bottom padding
             self.buffer.append(self.decorations.get("row")[::])
 
+        self.buffer.append(self.createRowFromString("Confirm: (Enter) | Cancel: (Escape)".center(4, "-"), self.graphSpace.parent.steelblue1))
         self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
 
         self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
@@ -499,6 +506,10 @@ class InputWindow(Menu):
                 self.valueBuffer = []
                 self.invalid = False
                 self.parentEntry.onInputWindowCancel()
+            elif(keyname == "KEY_RIGHT"):
+                self.cursorPos += 1 if self.cursorPos < 0 else 0
+            elif(keyname == "KEY_LEFT"):
+                self.cursorPos -= 1 if abs(self.cursorPos) < len(self.valueBuffer) else 0
         elif(keyval.isprintable()):
             self.invalid = False
             self.addToVal(keyval.lower())

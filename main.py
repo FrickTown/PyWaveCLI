@@ -21,7 +21,9 @@ class TerminalSpace(Terminal):
         super().__init__(kind, stream, force_styling)
         self.buffer = [[" " for _ in range(self.width)] for _ in range(self.height-1)]
     
-    def handleResize(sig, action, info):
+    def handleResize(self, sig, action):
+        #self.graphspaces[0].xCellCount = self.width
+        #self.graphspaces[0].yCellCount = self.height
         pass
 
     def render(self):
