@@ -450,18 +450,22 @@ class InputWindow(Menu):
         return out
     
     def addToVal(self, char):
-        self.valueBuffer.append(char)
+        if(self.cursorPos == 0):
+            self.valueBuffer.append(char)
+        else:
+            self.valueBuffer.insert(self.cursorPos, char)
+            
     
     def remFromVal(self):
-        if len(self.valueBuffer):
-            self.valueBuffer.pop()
+        if len(self.valueBuffer) and abs(self.cursorPos) < len(self.valueBuffer):
+            self.valueBuffer.pop(self.cursorPos-1)
 
     def generateMenu(self):
         """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
         self.buffer = []
 
-        if(len(self.valueBuffer) > self.minWidth):
-            self.minWidth = len(self.valueBuffer) + self.hPadding
+        if(len(self.valueBuffer)+1 > self.minWidth):
+            self.minWidth = len(self.valueBuffer) + self.hPadding + 1
             self.generateDecorations()
             self.titleAsBuffer = self.createRowFromString(self.title, self.graphSpace.parent.bright_magenta)
 
@@ -499,17 +503,21 @@ class InputWindow(Menu):
             if(keyname == "KEY_ENTER"):
                     if(self.parentEntry.onInputWindowConfirm("".join(self.valueBuffer), self.args)):self.invalid = False
                     else:self.invalid = True
+            # Delete symbol at cursor
             elif(keyname == "KEY_BACKSPACE"):
                 self.remFromVal()
                 self.invalid = False
+            # Allow for cancelling an input prompt
             elif(keyname == "KEY_ESCAPE"):
                 self.valueBuffer = []
                 self.invalid = False
                 self.parentEntry.onInputWindowCancel()
+            # Cursor movement
             elif(keyname == "KEY_RIGHT"):
                 self.cursorPos += 1 if self.cursorPos < 0 else 0
             elif(keyname == "KEY_LEFT"):
                 self.cursorPos -= 1 if abs(self.cursorPos) < len(self.valueBuffer) else 0
+        # Add any non-special keys to valuebuffer
         elif(keyval.isprintable()):
             self.invalid = False
             self.addToVal(keyval.lower())
