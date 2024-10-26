@@ -117,6 +117,9 @@ class Graphspace():
         self.waves.append(wave)
         self.menu.addWaveEntry(wave)
         self.menu.generateMenu()
+    
+    def addWaveFromEntry(self, waveEntry: menu.WaveEntry):
+        self.waves.append(waveEntry.wave)
 
     def clearBuffer(self):
         # Reset the graphics buffer
@@ -257,7 +260,6 @@ class Wave():
         self.func = newFunc
         self.asFunction = asFunction
         return True
-
 
 
 def main():

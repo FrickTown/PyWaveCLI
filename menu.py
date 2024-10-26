@@ -171,6 +171,14 @@ class SelectionMenu(Menu):
         self.menuEntries.append(newEntry)
         self.generateMenu()
         newEntry.createSubMenu()
+
+    def removeEntryAt(self, index: int):
+        if index < -1 or abs(index) >= len(self.menuEntries):
+            return
+        if index < self.activeIndex:
+            self.selectIndex(self.activeIndex-1)
+        entry = self.menuEntries.pop(index)
+        self.generateMenu()
     
     def handleInput(self, keyval: keyboard.Keystroke):
         # If an input window is open, pass the input along to it
@@ -209,8 +217,16 @@ class SelectionMenu(Menu):
                 wav.wave.resetWave()
                 self.generateMenu()
         elif(keyval.lower() == " "):
-            self.getSelectedEntry().openInputWindow()
+            self.getSelectedEntry().openInputWindow("Edit function: ")
             return
+        elif(keyval.lower() == "n"):
+            if(type(self.getSelectedEntry()) is WaveEntry):
+                newIndex = len(self.menuEntries)
+                newEntry = WaveEntry(self, main.Wave("x", self.graphSpace.parent.gray100, {}, visible=True))
+                self.addEntries([newEntry])
+                self.selectIndex(newIndex)
+                self.getSelectedEntry().openInputWindow("Add a new function: ", "new")
+                self.generateMenu()
 
     def select(self, change: int):
         """Select a neighboring entry in the active menu
@@ -232,6 +248,16 @@ class SelectionMenu(Menu):
         self.menuEntries[self.activeIndex].active = False
         newSelection.active = True
         self.activeIndex = newActualIndex
+        self.generateMenu()
+    
+    def selectIndex(self, index: int):
+        if index < 0 or index >= len(self.menuEntries) or not self.menuEntries[index].selectable:
+            return
+
+        newSelection = self.menuEntries[index]
+        self.menuEntries[self.activeIndex].active = False
+        newSelection.active = True
+        self.activeIndex = index
         self.generateMenu()
 
     def toggleSubMenu(self):
@@ -295,7 +321,7 @@ class SelectableEntry(MenuEntry):
         self.parent.inputWindowOverride = False
 
     @abstractmethod
-    def openInputWindow(self, title: str = ""):
+    def openInputWindow(self, title: str = "", *args):
         self.parent.inputWindowOverride = True
 
     @abstractmethod
@@ -338,14 +364,24 @@ class WaveEntry(SelectableEntry):
             if(not self.wave.tryUpdateWaveFunction(input, {})):
                 return False
 
+            if(len(args) and args[0] == "new"):
+                self.parent.graphSpace.addWaveFromEntry(self)
+
             self.parent.inputWindowOverride = False
             self.inputWindow = None
             self.parent.generateMenu()
             return True
+
+    def onInputWindowCancel(self):
+        inArgs = self.inputWindow.args
+        super().onInputWindowCancel()
+        if(len(inArgs) and inArgs[0] == "new"):
+            parentMenu: SelectionMenu = self.parent
+            parentMenu.removeEntryAt(-1)
     
-    def openInputWindow(self, title: str = ""):
+    def openInputWindow(self, title: str = "", *args):
         super().openInputWindow(title)
-        self.inputWindow = InputWindow(self, "Enter a new function:")
+        self.inputWindow = InputWindow(self, title, *args)
         self.inputWindow.setValueBuffer(list(self.wave.func))
 
 
@@ -384,7 +420,7 @@ class ArgEntry(SelectableEntry):
         self.parent.generateMenu()
         return True
 
-    def openInputWindow(self, title: str = ""):
+    def openInputWindow(self, title: str = "", *args):
         super().openInputWindow(title)
         self.inputWindow = InputWindow(self, "Enter increment value for " + self.argName + ":", "incr".center(4))
         self.inputWindow.setValueBuffer(list(str(self.wave.customVars[self.argName]["incr"])))
@@ -412,7 +448,7 @@ class InputWindow(Menu):
         self.args = args
         self.title = textPrompt
         self.valueBuffer: list[str] = []
-        self.minWidth = len("| Confirm: (Enter) | Cancel: (Escape) |") + self.hPadding
+        self.minWidth = len("| Confirm: (Enter) | Cancel: (Tab) |") + self.hPadding
         self.generateDecorations()
         self.parentMenu: SelectionMenu = parentEntry.parent
         self.graphSpace: main.Graphspace = self.parentMenu.graphSpace
@@ -487,7 +523,7 @@ class InputWindow(Menu):
         for _ in range(self.vPadding):                          # Bottom padding
             self.buffer.append(self.decorations.get("row")[::])
 
-        self.buffer.append(self.createRowFromString("Confirm: (Enter) | Cancel: (Escape)".center(4, "-"), self.graphSpace.parent.steelblue1))
+        self.buffer.append(self.createRowFromString("Confirm: (Enter) | Cancel: (Tab)".center(4, "-"), self.graphSpace.parent.steelblue1))
         self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
 
         self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
@@ -508,7 +544,7 @@ class InputWindow(Menu):
                 self.remFromVal()
                 self.invalid = False
             # Allow for cancelling an input prompt
-            elif(keyname == "KEY_ESCAPE"):
+            elif(keyname == "KEY_TAB"):
                 self.valueBuffer = []
                 self.invalid = False
                 self.parentEntry.onInputWindowCancel()
