@@ -82,7 +82,7 @@ class Graphspace():
     menu: menu.Menu = None
 
     def __init__(self, parent: TerminalSpace, xCellCount: int, yCellCount: int, xRange:float, yRange: float, stepSize: float):
-        self.parent = parent
+        self.parentTerminal = parent
         self.xCellCount = xCellCount
         self.yCellCount = yCellCount if (yCellCount % 2 != 0) else yCellCount - 1
         self.xRange = xRange
@@ -90,9 +90,10 @@ class Graphspace():
         self.stepSize = stepSize
         self.clearBuffer()
         self.menu = menu.SelectionMenu(self)
-        self.menu.addInfoEntry("Navigation| Option: (Up/Down)  | Select: (Enter)  |", parent.cadetblue1)
-        self.menu.addInfoEntry("          | Back: (Backspace)  | Edit: (Spacebar) |", parent.cadetblue1)
-        self.menu.addInfoEntry("Wave Menu | Toggle Wave: (Tab) | Reset Wave: (R)  |", parent.steelblue1)
+        self.menu.addInfoEntry("Navigation| Option:  (Up/Down) | Edit:    (Enter) |", parent.cadetblue1)
+        self.menu.addInfoEntry("          | Back:  (Backspace) | Submenu: (Space) |", parent.cadetblue1)
+        self.menu.addInfoEntry("Wave Menu | Toggle Wave: (Tab) | Reset Wave:  (R) |", parent.steelblue1)
+        self.menu.addInfoEntry("          | Create Wave:   (N) | Set Color:   (C) |", parent.steelblue1)
         self.menu.addInfoEntry("", parent.normal)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
@@ -151,7 +152,7 @@ class Graphspace():
             for wave in self.waves:
                 if not wave.visible: continue
                 cellPos = self.cartesianToGraphspace(x, wave.getY(x))
-                if cellPos != None: self.buffer[cellPos[1]][cellPos[0]] = f"{wave.termColor}0{self.parent.normal}"
+                if cellPos != None: self.buffer[cellPos[1]][cellPos[0]] = f"{wave.termColor}0{self.parentTerminal.normal}"
             x += self.stepSize
     
     def printUIToBuffer(self):
@@ -221,7 +222,9 @@ class Wave():
         for var in self.originalVars.keys():
             for key in self.originalVars[var]:
                 self.customVars[var][key] = self.originalVars[var][key]
-
+        self.refreshWaveFunction()
+    
+    def refreshWaveFunction(self):
         lambdafied = "lambda x, "
         for av in self.customVars.keys():
             lambdafied += f"{av},"
@@ -264,26 +267,31 @@ class Wave():
 
 def main():
     term = TerminalSpace()
-    if(os.name != "nt"): # Resize event handler only available on Linux / MacOS
-        signal.signal(signal.SIGWINCH, term.handleResize)
-    # Set cursor to 0,0, set theme, clear terminal
-    print(f"{term.home}{term.gray100_on_gray1}{term.clear}")
-    
-    # Print example waves from a separate module (To avoid cluttering the code... even more than it already is...)
-    from examples import addWaves
-    addWaves(term)
+    with term.hidden_cursor():
+        
+        if(os.name != "nt"): # Resize event handler only available on Linux / MacOS
+            signal.signal(signal.SIGWINCH, term.handleResize)
+        # Set cursor to 0,0, set theme, clear terminal
+        print(f"{term.home}{term.gray100_on_gray1}{term.clear}")
+        
+        # Print example waves from a separate module (To avoid cluttering the code... even more than it already is...)
+        from examples import addWaves
+        addWaves(term)
 
-    with term.cbreak():
-        val = keyboard.Keystroke("")
-        while True:
-            if(val.lower() == "q" and not term.graphspaces[0].menu.recursiveSubMenuFetch().inputWindowOverride): break
-            if(val.lower() == "m" and not term.graphspaces[0].menu.recursiveSubMenuFetch().inputWindowOverride):
-                term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
-            if(term.graphspaces[0].showMenu and val != ""):
-                term.graphspaces[0].menu.handleInput(val)
+        with term.cbreak():
+            val = keyboard.Keystroke("")
+            while True:
+                deepestMenu = term.graphspaces[0].menu.recursiveSubMenuFetch()
+                if(val.lower() == "q" and not deepestMenu.inputWindowOverride): break
+                if(val.lower() == "m" and not deepestMenu.inputWindowOverride):
+                    term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
+                if(term.graphspaces[0].showMenu and val != ""):
+                    term.graphspaces[0].menu.handleInput(val)
+                if(term.graphspaces[0].showMenu and val == "" and type(deepestMenu.getSelectedEntry()) is menu.ArgValEntry):
+                    deepestMenu.generateMenu()
 
-            term.render()
-            val = term.inkey(timeout=(1/FRAMERATE))
-        os.system("cls||clear")
+                term.render()
+                val = term.inkey(timeout=(1/FRAMERATE))
+            os.system("cls||clear")
 if __name__ == "__main__":
     main()

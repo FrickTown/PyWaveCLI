@@ -48,14 +48,19 @@ class Menu(ABC):
         else: padOut = [" " for _ in range((self.minWidth + 3) - len(rowText))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
         rowList = list(rowText)
         rowList = list(map(lambda x: color + x, rowList))
-        out = [self.decorations.get("row")[0]] + [" " for _ in range(self.hPadding)] + rowList + padOut + [" " for _ in range(self.hPadding)] + [self.graphSpace.parent.normal + self.decorations.get("row")[-1]]
+        out = [self.decorations.get("row")[0]] + [" " for _ in range(self.hPadding)] + rowList + padOut + [" " for _ in range(self.hPadding)] + [self.graphSpace.parentTerminal.normal + self.decorations.get("row")[-1]]
         return out
     
-    def recursiveSubMenuFetch(self):
+    def recursiveSubMenuFetch(self) -> SelectionMenu:
         if(self.activeSubmenu):
             return self.activeSubmenu.recursiveSubMenuFetch()
         else:
             return self
+    
+    def refreshSelfAndParents(self):
+        if(self.parentMenu):
+            self.parentMenu.refreshSelfAndParents()
+        self.generateMenu()
 
     @abstractmethod
     def generateMenu(self):
@@ -76,6 +81,7 @@ class SelectionMenu(Menu):
         super().__init__(graphSpace, name, parentMenu)
         self.menuEntries = []
         if(parentMenu):
+            self.parentMenu: SelectionMenu = parentMenu
             self.xRenderOffset = parentMenu.xRenderOffset + len(parentMenu.buffer[0])
 
     def generateMenu(self):
@@ -114,7 +120,7 @@ class SelectionMenu(Menu):
 
         self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
 
-        if(self.getSelectedEntry().inputWindow is not None):
+        if(len(self.getSelectableEntries()) and self.getSelectedEntry().inputWindow is not None):
             self.getSelectedEntry().inputWindow.generateMenu()
 
     def getSelectableEntries(self):
@@ -123,7 +129,9 @@ class SelectionMenu(Menu):
     
     def getSelectedEntry(self) -> SelectableEntry:
         """Return the MenuEntry subclass object that is currently selected in the menu"""
-        return self.menuEntries[self.activeIndex]
+        if(len(self.getSelectableEntries()) > 0):
+            return self.menuEntries[self.activeIndex]
+        return None
     
     def addEntries(self, entries: list[MenuEntry]):
         """ Add multiple entries in a list. Currently unused.
@@ -135,6 +143,7 @@ class SelectionMenu(Menu):
                 entry.active = True
                 self.activeIndex = len(self.menuEntries)
             self.menuEntries.append(entry)
+        self.generateMenu()
 
     def addInfoEntry(self, info: str, color: str):
         """ Create and add a text entry.
@@ -171,6 +180,20 @@ class SelectionMenu(Menu):
         self.menuEntries.append(newEntry)
         self.generateMenu()
         newEntry.createSubMenu()
+    
+    def addArgValEntry(self, argEntry: ArgEntry, argKey: str):
+        """ Create and add an arg entry.
+        keyword arguments:
+            wave -- The wave which will be represented by its function in the menu
+            argName -- The name of the custom variable
+        """
+        newEntry = ArgValEntry(self, argEntry, argKey)
+        if(len(self.getSelectableEntries()) == 0):
+            newEntry.active = True
+            self.activeIndex = len(self.menuEntries)
+        self.menuEntries.append(newEntry)
+        self.generateMenu()
+        newEntry.createSubMenu()
 
     def removeEntryAt(self, index: int):
         if index < -1 or abs(index) >= len(self.menuEntries):
@@ -199,7 +222,14 @@ class SelectionMenu(Menu):
             elif(keyname == "KEY_DOWN"):
                 self.select(1)
             elif(keyname == "KEY_ENTER"):
-                self.toggleSubMenu()
+                if(type(self.getSelectedEntry()) is WaveEntry):
+                    self.getSelectedEntry().openInputWindow("Edit function: ", "edit")
+                elif(type(self.getSelectedEntry()) is ArgEntry):
+                    self.getSelectedEntry().openInputWindow("Edit variable name: ", "edit")
+                elif(type(self.getSelectedEntry()) is ArgValEntry):
+                    self.getSelectedEntry().openInputWindow("", "edit")
+                self.generateMenu()
+                return
             elif(keyname == "KEY_BACKSPACE"):
                 if(not self.parentMenu):
                     self.graphSpace.showMenu = False
@@ -217,16 +247,29 @@ class SelectionMenu(Menu):
                 wav.wave.resetWave()
                 self.generateMenu()
         elif(keyval.lower() == " "):
-            self.getSelectedEntry().openInputWindow("Edit function: ")
+            self.toggleSubMenu()
             return
         elif(keyval.lower() == "n"):
-            if(type(self.getSelectedEntry()) is WaveEntry):
+            if(type(self.getSelectedEntry()) is WaveEntry): # If the currently selected entry is a Wave Entry, we're in the root menu and adding a new wave
                 newIndex = len(self.menuEntries)
-                newEntry = WaveEntry(self, main.Wave("x", self.graphSpace.parent.gray100, {}, visible=True))
+                newEntry = WaveEntry(self, main.Wave("x", self.graphSpace.parentTerminal.gray100, {}, visible=True))
                 self.addEntries([newEntry])
                 self.selectIndex(newIndex)
                 self.getSelectedEntry().openInputWindow("Add a new function: ", "new")
                 self.generateMenu()
+            elif(type(self.parentMenu.getSelectedEntry()) is WaveEntry): # Allows adding new ArgEntries even if the containing menu is empty
+                newIndex = len(self.menuEntries)
+                parentEntry: WaveEntry = self.parentMenu.getSelectedEntry()
+                newEntry = ArgEntry(self, parentEntry.wave, "X")
+                self.addEntries([newEntry])
+                self.selectIndex(newIndex)
+                self.getSelectedEntry().openInputWindow("Add a new variable: ", "newVar")
+                self.generateMenu()
+
+        elif(keyval.lower() == "c"):
+            if(type(self.getSelectedEntry()) is WaveEntry):
+                selected: WaveEntry = self.getSelectedEntry()
+                selected.openInputWindow("Set new RGB value. Format: 255,255,255", "color")
 
     def select(self, change: int):
         """Select a neighboring entry in the active menu
@@ -273,12 +316,150 @@ class SelectionMenu(Menu):
             self.activeSubmenu = None
 
 
+class InputWindow(Menu):
+    # Frame buffer
+    buffer: list[list[str]] = [[]]
+    
+    # Style values
+    minWidth: int = 20
+    minHeight: int = 30
+    hPadding: int = 2
+    vPadding: int = 1
+    decorations: dict = {}
+    xRenderOffset: int = 0
+
+    # Text value logic
+    valueBuffer: list[str] = []
+    cursorPos: int = 0
+
+    title: str = ""
+    titleAsBuffer: list[str] = []
+
+    def __init__(self, parentEntry: SelectableEntry, textPrompt: str, *args):
+        self.args = args
+        self.title = textPrompt
+        self.valueBuffer: list[str] = []
+        self.minWidth = len("| Confirm: (Enter) | Cancel: (Tab) |") + self.hPadding
+        self.generateDecorations()
+        self.parentMenu: SelectionMenu = parentEntry.parent
+        self.graphSpace: main.Graphspace = self.parentMenu.graphSpace
+        self.parentEntry: SelectableEntry = parentEntry
+        self.titleAsBuffer = self.createRowFromString(textPrompt, self.graphSpace.parentTerminal.bright_magenta)
+        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(self.minWidth/2) - self.hPadding
+        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(self.minHeight/2) + self.vPadding
+        self.invalid = False
+    
+    def generateDecorations(self):
+        self.decorations = {
+            "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┓"],
+            "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2)] + ["┃"],
+            "bot": ["┗"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┛"],
+        }
+
+    def setValueBuffer(self, buffer: list[str]):
+        self.valueBuffer = buffer
+        self.generateMenu()
+
+    def createRowFromString(self, rowText: str, color: str):
+        """ Create a properly formatted row that fits into the window, from a supplied string and color.
+        keyword arguments:
+        rowText -- String to write to menu row
+        color -- The ANSI code to color the menu row
+        """
+        rowList = list(rowText)
+        return self.generateMenuRowFromList(rowList, color)
+
+    def generateMenuRowFromList(self, rowList: list[str], color: str):
+        padOut = []
+        padOut = [" " for _ in range((self.minWidth) - len(rowList))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
+        rowList = list(map(lambda x: color + x, rowList))
+        out = [self.decorations.get("row")[0]] + [" " for _ in range(self.hPadding)] + rowList + padOut + [" " for _ in range(self.hPadding)] + [self.graphSpace.parentTerminal.normal + self.decorations.get("row")[-1]]
+        return out
+    
+    def addToVal(self, char):
+        if(self.cursorPos == 0):
+            self.valueBuffer.append(char)
+        else:
+            self.valueBuffer.insert(self.cursorPos, char)
+            
+    
+    def remFromVal(self):
+        if len(self.valueBuffer) and abs(self.cursorPos) < len(self.valueBuffer):
+            self.valueBuffer.pop(self.cursorPos-1)
+
+    def generateMenu(self):
+        """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
+        self.buffer = []
+
+        if(len(self.valueBuffer)+1 > self.minWidth):
+            self.minWidth = len(self.valueBuffer) + self.hPadding + 1
+            self.generateDecorations()
+            self.titleAsBuffer = self.createRowFromString(self.title, self.graphSpace.parentTerminal.bright_magenta)
+
+        # Print the rows
+        self.buffer.append(self.decorations.get("top")[::])     # Print the top
+
+        for _ in range(self.vPadding):                          # Top padding
+            self.buffer.append(self.decorations.get("row")[::])
+
+        self.buffer.append(self.titleAsBuffer)
+        self.buffer.append(self.decorations.get("row")[::])
+        # Print the cursor
+        displayBuffer = self.valueBuffer[::]
+        if(self.cursorPos == 0):
+            displayBuffer.append(self.graphSpace.parentTerminal.gray100 + "_")
+        else:
+            displayBuffer.insert(self.cursorPos, self.graphSpace.parentTerminal.gray100 + "_")
+        self.buffer.append(self.generateMenuRowFromList(displayBuffer, self.graphSpace.parentTerminal.bright_green if not self.invalid else self.graphSpace.parentTerminal.brown1))
+        for _ in range(self.vPadding):                          # Bottom padding
+            self.buffer.append(self.decorations.get("row")[::])
+
+        self.buffer.append(self.createRowFromString("Confirm: (Enter) | Cancel: (Tab)".center(4, "-"), self.graphSpace.parentTerminal.steelblue1))
+        self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
+
+        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
+        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(len(self.buffer)/2)
+
+    def handleInput(self, keyval: keyboard.Keystroke):
+        """Input handler for InputMenu. Checks for special keys, otherwise, passes it on to the value buffer. 
+        keyword arguments:
+            keyval -- The keystroke read from stdin
+        """
+        if(keyval.name):
+            keyname = keyval.name
+            if(keyname == "KEY_ENTER"):
+                    if(self.parentEntry.onInputWindowConfirm("".join(self.valueBuffer), self.args)):self.invalid = False
+                    else:self.invalid = True
+            # Delete symbol at cursor
+            elif(keyname == "KEY_BACKSPACE"):
+                self.remFromVal()
+                self.invalid = False
+            elif(keyname == "KEY_DELETE"):
+                self.valueBuffer.clear()
+                self.invalid = False
+            # Allow for cancelling an input prompt
+            elif(keyname == "KEY_TAB" or keyname == "KEY_ESCAPE"):
+                self.valueBuffer = []
+                self.invalid = False
+                self.parentEntry.onInputWindowCancel()
+            # Cursor movement
+            elif(keyname == "KEY_RIGHT"):
+                self.cursorPos += 1 if self.cursorPos < 0 else 0
+            elif(keyname == "KEY_LEFT"):
+                self.cursorPos -= 1 if abs(self.cursorPos) < len(self.valueBuffer) else 0
+        # Add any non-special keys to valuebuffer
+        elif(keyval.isprintable()):
+            self.invalid = False
+            self.addToVal(keyval.lower())
+        self.generateMenu()
+
 class MenuEntry(ABC):
     def __init__(self, menu: Menu):
         self.parent = menu
         self.styles = {
-            "underline": self.parent.graphSpace.parent.underline,
-            "normal": self.parent.graphSpace.parent.normal
+            "underline": self.parent.graphSpace.parentTerminal.underline,
+            "normal": self.parent.graphSpace.parentTerminal.normal,
+            "white": self.parent.graphSpace.parentTerminal.gray100
         }
         self.selectable = False
         self.active = False
@@ -291,7 +472,6 @@ class MenuEntry(ABC):
     @abstractmethod
     def getMenuRow(self):
         pass
-
 
 
 class InfoEntry(MenuEntry):
@@ -333,13 +513,13 @@ class SelectableEntry(MenuEntry):
         pass
     
 
-
 class WaveEntry(SelectableEntry):
 
     def __init__(self, menu: Menu, wave: main.Wave):
         super().__init__(menu)
-        self.wave = wave
-        self.color = wave.termColor
+        self.wave: main.Wave = wave
+        self.color: str = wave.termColor
+        self.colorAsRGB: tuple[int,int,int] = (-1,-1,-1)
     
     def getEntryText(self):
         return self.wave.func
@@ -356,17 +536,34 @@ class WaveEntry(SelectableEntry):
 
     def createSubMenu(self):
         self.subMenu = SelectionMenu(self.parent.graphSpace, f"waveArgs{self.parent.getSelectableEntries().index(self)}", self.parent)
+        self.subMenu.addInfoEntry(f"Custom variables:", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
+        self.subMenu.addInfoEntry(f"", self.color)
         for var in self.wave.customVars.keys():
             self.subMenu.addArgEntry(self.wave, var)
         self.subMenu.generateMenu()
+    
+    def tryUpdateColor(self, input: str) -> bool:
+        try:
+            values = input.split(",")
+            if len(values) != 3 or len(input) > 11:
+                return False 
+            self.wave.termColor = self.parent.graphSpace.parentTerminal.color_rgb(*values)
+            self.color = self.wave.termColor
+            self.parent.graphSpace.parentTerminal.rgb
+        except Exception:
+            return False
+        return True
 
     def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
-            if(not self.wave.tryUpdateWaveFunction(input, {})):
-                return False
-
-            if(len(args) and args[0] == "new"):
-                self.parent.graphSpace.addWaveFromEntry(self)
-
+            if(len(args)):
+                if(args[0] == "color" and not self.tryUpdateColor(input)):
+                   return False
+                if((args[0] == "edit" or args[0] == "new") and not self.wave.tryUpdateWaveFunction(input, {})):
+                    return False
+                if(len(args) and args[0] == "new"):
+                    self.parent.graphSpace.addWaveFromEntry(self)
+                    self.wave.originalFunc = self.wave.func # Make sure the user submitted function is the original function
+                    self.createSubMenu()
             self.parent.inputWindowOverride = False
             self.inputWindow = None
             self.parent.generateMenu()
@@ -382,7 +579,10 @@ class WaveEntry(SelectableEntry):
     def openInputWindow(self, title: str = "", *args):
         super().openInputWindow(title)
         self.inputWindow = InputWindow(self, title, *args)
-        self.inputWindow.setValueBuffer(list(self.wave.func))
+        if not (len(args) and args[0] == "color"):
+            self.inputWindow.setValueBuffer(list(self.wave.func))
+        else:
+            self.inputWindow.setValueBuffer(list("255,255,255"))
 
 
 class ArgEntry(SelectableEntry):
@@ -390,10 +590,10 @@ class ArgEntry(SelectableEntry):
         super().__init__(menu)
         self.wave = wave
         self.argName = argName
-        self.argRow = wave.customVars[argName]
+        self.argRow = {"value": 0, "incr": 0} if not wave.customVars.__contains__(argName) else wave.customVars[argName]
     
     def getEntryText(self):
-        return f"{self.argName}: {self.argRow['incr']}"
+        return f"{self.argName}"
 
     def getMenuRow(self):
         padOut = [" " for _ in range((self.parent.minWidth) - len(self.getEntryText()))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
@@ -406,6 +606,74 @@ class ArgEntry(SelectableEntry):
         return out
     
     def createSubMenu(self):
+        self.subMenu = SelectionMenu(self.parent.graphSpace, f"{self.argName}-values", self.parent)
+        self.subMenu.addInfoEntry(f"Variable values of ({self.argName}):", self.parent.graphSpace.parentTerminal.color_rgb(180, 180, 225))
+        for key in self.argRow:
+            self.subMenu.addArgValEntry(self, key)
+        self.subMenu.generateMenu()
+
+    def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
+        if(len(args)):
+            if(args[0] == "newVar" or args[0] == "edit"):
+                if not (input.isalpha) or len(input) < 1 or input == "x" or len(input.split(" ")) != 1: return False # Don't allow funky characters, blank, or x as variable names (messes with eval)
+                if(self.wave.customVars.__contains__(input)): return False
+                self.wave.customVars.update({input: self.argRow})
+                if(args[0] == "edit" and self.argName != input):
+                    self.wave.func = self.wave.func.replace(self.argName, input)
+                    self.wave.originalFunc = self.wave.originalFunc.replace(self.argName, input)
+                    self.wave.originalVars[input] = self.wave.originalVars.pop(self.argName)
+                    self.wave.customVars.pop(self.argName)
+                self.argName = input
+                self.wave.refreshWaveFunction()
+                self.createSubMenu()
+            self.parent.refreshSelfAndParents()
+            
+        self.parent.inputWindowOverride = False
+        self.inputWindow = None
+        return True
+
+    def openInputWindow(self, title: str = "", *args):
+        super().openInputWindow(title)
+        self.inputWindow = InputWindow(self, title, *args)
+        self.inputWindow.setValueBuffer(list(self.argName))
+
+    def onInputWindowCancel(self):
+        inArgs = self.inputWindow.args
+        super().onInputWindowCancel()
+        if(len(inArgs) and inArgs[0] == "newVar"):
+            parentMenu: SelectionMenu = self.parent
+            parentMenu.removeEntryAt(-1)
+
+class ArgValEntry(SelectableEntry):
+    def __init__(self, menu: SelectionMenu, argEntry: ArgEntry, argKey: str):
+        super().__init__(menu)
+        self.argEntry = argEntry
+        self.argKey = argKey
+
+    def getValue(self):
+        return self.argEntry.argRow[self.argKey]
+    
+    def setValue(self, val):
+        self.argEntry.wave.customVars[self.argEntry.argName].update({self.argKey: val})
+
+    def getEntryText(self):
+        return (self.argKey, '{0:.5f}'.format(self.getValue()))
+
+    def getMenuRow(self):
+        idx = list(f"{self.parent.getSelectableEntries().index(self) + 1}. ") # Print the number on the left of the entry
+        idx = list(map(lambda x: self.argEntry.wave.termColor + x, idx))
+        entryText = self.getEntryText()
+        keyBuff = list(entryText[0])
+        valBuff = list(str(entryText[1]))
+        keyBuff[0] = self.argEntry.wave.termColor + keyBuff[0]
+        valBuff[0] = self.argEntry.parent.graphSpace.parentTerminal.gray100 + valBuff[0]
+        keyBuff[0] = (self.styles["underline"] if self.active else "") + keyBuff[0]
+        keyBuff[-1] = keyBuff[-1] + self.styles["normal"]
+        padOut = [" " for _ in range((self.parent.minWidth) - (len(keyBuff) + len(valBuff) + 2))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
+        out = [self.parent.decorations.get("row")[0]] + [" " for _ in range(self.parent.hPadding)] + idx + keyBuff + [":"," "] +valBuff + padOut + [" " for _ in range(self.parent.hPadding)] + [self.styles["normal"] + self.parent.decorations.get("row")[-1]]
+        return out
+    
+    def createSubMenu(self):
         pass
 
     def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
@@ -414,147 +682,13 @@ class ArgEntry(SelectableEntry):
             newValue = tryParse()
         except Exception:
             return False
-        self.wave.customVars[self.argName][args[0]] = newValue
+        self.setValue(newValue)
         self.parent.inputWindowOverride = False
         self.inputWindow = None
         self.parent.generateMenu()
         return True
 
-    def openInputWindow(self, title: str = "", *args):
-        super().openInputWindow(title)
-        self.inputWindow = InputWindow(self, "Enter increment value for " + self.argName + ":", "incr".center(4))
-        self.inputWindow.setValueBuffer(list(str(self.wave.customVars[self.argName]["incr"])))
-
-class InputWindow(Menu):
-    # Frame buffer
-    buffer: list[list[str]] = [[]]
-    
-    # Style values
-    minWidth: int = 20
-    minHeight: int = 30
-    hPadding: int = 2
-    vPadding: int = 1
-    decorations: dict = {}
-    xRenderOffset: int = 0
-
-    # Text value logic
-    valueBuffer: list[str] = []
-    cursorPos: int = 0
-
-    title: str = ""
-    titleAsBuffer: list[str] = []
-
-    def __init__(self, parentEntry: SelectableEntry, textPrompt: str, *args):
-        self.args = args
-        self.title = textPrompt
-        self.valueBuffer: list[str] = []
-        self.minWidth = len("| Confirm: (Enter) | Cancel: (Tab) |") + self.hPadding
-        self.generateDecorations()
-        self.parentMenu: SelectionMenu = parentEntry.parent
-        self.graphSpace: main.Graphspace = self.parentMenu.graphSpace
-        self.parentEntry: SelectableEntry = parentEntry
-        self.titleAsBuffer = self.createRowFromString(textPrompt, self.graphSpace.parent.bright_magenta)
-        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(self.minWidth/2) - self.hPadding
-        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(self.minHeight/2) + self.vPadding
-        self.invalid = False
-    
-    def generateDecorations(self):
-        self.decorations = {
-            "top": ["┏"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┓"],
-            "row": ["┃"] + [" " for _ in range(self.minWidth + self.hPadding*2)] + ["┃"],
-            "bot": ["┗"] + ["━" for _ in range(self.minWidth + self.hPadding*2)] + ["┛"],
-        }
-
-    def setValueBuffer(self, buffer: list[str]):
-        self.valueBuffer = buffer
-        self.generateMenu()
-
-    def createRowFromString(self, rowText: str, color: str):
-        """ Create a properly formatted row that fits into the window, from a supplied string and color.
-        keyword arguments:
-        rowText -- String to write to menu row
-        color -- The ANSI code to color the menu row
-        """
-        rowList = list(rowText)
-        return self.generateMenuRowFromList(rowList, color)
-
-    def generateMenuRowFromList(self, rowList: list[str], color: str):
-        padOut = []
-        padOut = [" " for _ in range((self.minWidth) - len(rowList))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
-        rowList = list(map(lambda x: color + x, rowList))
-        out = [self.decorations.get("row")[0]] + [" " for _ in range(self.hPadding)] + rowList + padOut + [" " for _ in range(self.hPadding)] + [self.graphSpace.parent.normal + self.decorations.get("row")[-1]]
-        return out
-    
-    def addToVal(self, char):
-        if(self.cursorPos == 0):
-            self.valueBuffer.append(char)
-        else:
-            self.valueBuffer.insert(self.cursorPos, char)
-            
-    
-    def remFromVal(self):
-        if len(self.valueBuffer) and abs(self.cursorPos) < len(self.valueBuffer):
-            self.valueBuffer.pop(self.cursorPos-1)
-
-    def generateMenu(self):
-        """ Uses all current menu data to generate a frame buffer. Should only be called when menu's data has changed in any way."""
-        self.buffer = []
-
-        if(len(self.valueBuffer)+1 > self.minWidth):
-            self.minWidth = len(self.valueBuffer) + self.hPadding + 1
-            self.generateDecorations()
-            self.titleAsBuffer = self.createRowFromString(self.title, self.graphSpace.parent.bright_magenta)
-
-        # Print the rows
-        self.buffer.append(self.decorations.get("top")[::])     # Print the top
-
-        for _ in range(self.vPadding):                          # Top padding
-            self.buffer.append(self.decorations.get("row")[::])
-
-        self.buffer.append(self.titleAsBuffer)
-        self.buffer.append(self.decorations.get("row")[::])
-        # Print the cursor
-        displayBuffer = self.valueBuffer[::]
-        if(self.cursorPos == 0):
-            displayBuffer.append(self.graphSpace.parent.gray100 + "_")
-        else:
-            displayBuffer.insert(self.cursorPos, self.graphSpace.parent.gray100 + "_")
-        self.buffer.append(self.generateMenuRowFromList(displayBuffer, self.graphSpace.parent.bright_green if not self.invalid else self.graphSpace.parent.brown1))
-        for _ in range(self.vPadding):                          # Bottom padding
-            self.buffer.append(self.decorations.get("row")[::])
-
-        self.buffer.append(self.createRowFromString("Confirm: (Enter) | Cancel: (Tab)".center(4, "-"), self.graphSpace.parent.steelblue1))
-        self.buffer.append(self.decorations.get("bot")[::])     # Print bottom
-
-        self.xRenderOffset = round(self.graphSpace.xCellCount / 2) - round(len(self.buffer[0])/2)
-        self.yRenderOffset = round(self.graphSpace.yCellCount / 2) - round(len(self.buffer)/2)
-
-    def handleInput(self, keyval: keyboard.Keystroke):
-        """Input handler for InputMenu. Checks for special keys, otherwise, passes it on to the value buffer. 
-        keyword arguments:
-            keyval -- The keystroke read from stdin
-        """
-        if(keyval.name):
-            keyname = keyval.name
-            if(keyname == "KEY_ENTER"):
-                    if(self.parentEntry.onInputWindowConfirm("".join(self.valueBuffer), self.args)):self.invalid = False
-                    else:self.invalid = True
-            # Delete symbol at cursor
-            elif(keyname == "KEY_BACKSPACE"):
-                self.remFromVal()
-                self.invalid = False
-            # Allow for cancelling an input prompt
-            elif(keyname == "KEY_TAB"):
-                self.valueBuffer = []
-                self.invalid = False
-                self.parentEntry.onInputWindowCancel()
-            # Cursor movement
-            elif(keyname == "KEY_RIGHT"):
-                self.cursorPos += 1 if self.cursorPos < 0 else 0
-            elif(keyname == "KEY_LEFT"):
-                self.cursorPos -= 1 if abs(self.cursorPos) < len(self.valueBuffer) else 0
-        # Add any non-special keys to valuebuffer
-        elif(keyval.isprintable()):
-            self.invalid = False
-            self.addToVal(keyval.lower())
-        self.generateMenu()
+    def openInputWindow(self, title = "", *args):
+        super().openInputWindow(title, *args)
+        self.inputWindow = InputWindow(self, "Enter value for " + self.argEntry.argName + ":", "incr".center(4))
+        self.inputWindow.setValueBuffer(list(str(self.getValue())))
