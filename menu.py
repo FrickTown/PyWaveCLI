@@ -549,7 +549,7 @@ class WaveEntry(SelectableEntry):
                 return False 
             self.wave.termColor = self.parent.graphSpace.parentTerminal.color_rgb(*values)
             self.color = self.wave.termColor
-            self.parent.graphSpace.parentTerminal.rgb
+            self.colorAsRGB = values
         except Exception:
             return False
         return True
@@ -582,7 +582,7 @@ class WaveEntry(SelectableEntry):
         if not (len(args) and args[0] == "color"):
             self.inputWindow.setValueBuffer(list(self.wave.func))
         else:
-            self.inputWindow.setValueBuffer(list("255,255,255"))
+            self.inputWindow.setValueBuffer(list("255,255,255") if self.colorAsRGB[0] == -1 else list(",".join(self.colorAsRGB)))
 
 
 class ArgEntry(SelectableEntry):
