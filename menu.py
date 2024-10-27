@@ -11,6 +11,10 @@ import main
 from abc import ABC, abstractmethod
 
 class Menu(ABC):
+    """Menu is an abstract class that defines the outline and vital properties for a popup menu window.
+
+    Contains vanity properties and methods, as well as generally useful recursive accessors for finding the deepest active menu.
+    """
     # Frame buffer
     buffer: list[list[str]] = []
     
@@ -72,6 +76,10 @@ class Menu(ABC):
     
 
 class SelectionMenu(Menu):
+    """Menu type for selecting an entry with the arrows keys.
+
+    Can contain any number of MenuEntry types that derive from the base MenuEntry abstract class.
+    """
 
     # Menu entry logic
     activeIndex: int = None
@@ -342,6 +350,10 @@ class SelectionMenu(Menu):
 
 
 class InputWindow(Menu):
+    """Menu type for inputting a text-value using the keyboard. 
+    
+    The menu is created as needed and is taken care of by the garbage collector when it is closed
+    """
     # Frame buffer
     buffer: list[list[str]] = [[]]
     
@@ -478,7 +490,12 @@ class InputWindow(Menu):
             self.addToVal(keyval.lower())
         self.generateMenu()
 
+
 class MenuEntry(ABC):
+    """MenuEntry is an abstract class and only defines the basic properties an entry in a SelectionMenu needs.
+    
+    All entries need a parent menu, and needs to be marked selectable or not selectable.
+    """
     def __init__(self, menu: Menu):
         self.parent = menu
         self.styles = {
@@ -500,6 +517,9 @@ class MenuEntry(ABC):
 
 
 class InfoEntry(MenuEntry):
+    """The most basic type of MenuEntry. Used to display a string of text without making it selectable.
+
+    """
     def __init__(self, menu: Menu, info: str, color: str):
         super().__init__(menu)
         self.info = info
@@ -513,6 +533,12 @@ class InfoEntry(MenuEntry):
 
 
 class SelectableEntry(MenuEntry):
+    """SelectableEntry defines the outline of what a selectable entry in a SelectionMenu needs. 
+    It should be considered abstract, and contains abstract methods.
+
+    A SelectableEntry can be selected with the arrow keys, and can therefore house a submenu or InputMenu as needed.
+    Any SelectableEntry subclass must implement methods that handle these features.
+    """
     subMenu: Menu = None
     inputWindow: InputWindow = None
 
@@ -539,7 +565,10 @@ class SelectableEntry(MenuEntry):
     
 
 class WaveEntry(SelectableEntry):
-
+    """WaveEntry is a MenuEntry containing and displaying information about a wave. 
+    
+    It can house an input menu for editing the function of a wave, and a submenu containing information on its custom variables.
+    """
     def __init__(self, menu: Menu, wave: main.Wave):
         super().__init__(menu)
         self.wave: main.Wave = wave
@@ -550,7 +579,7 @@ class WaveEntry(SelectableEntry):
         return self.wave.func
 
     def getMenuRow(self):
-        padOut = [" " for _ in range((self.parent.minWidth) - len(self.getEntryText()))] # How many additional whitespaces to we need to print from the end of the function string to the end of the menu?
+        padOut = [" " for _ in range((self.parent.minWidth) - len(self.getEntryText()))] # How many additional whitespaces do we need to print from the end of the function string to the end of the menu?
         idx = list(f"{self.parent.getSelectableEntries().index(self) + 1}. ")
         idx = list(map(lambda x: self.wave.termColor + x, idx))
         func = list((self.getEntryText()))
@@ -613,6 +642,11 @@ class WaveEntry(SelectableEntry):
 
 
 class ArgEntry(SelectableEntry):
+    """ArgEntry is a MenuEntry containing and displaying information a custom variable of a wave.
+
+    It houses a submenu for editing the variable's instantaneous- and incremental value respectively.
+    It can also house an input window for editing the name of the variable, which will update its references in its referenced wave's function.
+    """
     def __init__(self, menu: Menu, wave: main.Wave, argName: str):
         super().__init__(menu)
         self.wave = wave
@@ -674,7 +708,12 @@ class ArgEntry(SelectableEntry):
             parentMenu: SelectionMenu = self.parent
             parentMenu.removeEntryAt(-1)
 
+
 class ArgValEntry(SelectableEntry):
+    """ArgValEntry is a MenuEntry containing and displaying information about either the instantaneous or incremental value of a custom variable. 
+
+    The ArgValEntry does not house a submenu, but can house an input window for editing the value of either of a variable's property.
+    """
     def __init__(self, menu: SelectionMenu, argEntry: ArgEntry, argKey: str):
         super().__init__(menu)
         self.argEntry = argEntry
