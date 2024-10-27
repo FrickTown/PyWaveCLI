@@ -292,13 +292,13 @@ def main():
                     if(val.lower() == "q"): break
                     elif(val.lower() == "m"):
                         term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
-                    elif(val.lower() == "+"):
-                        term.graphspaces[0].xRange += 1
                     elif(val.lower() == "-"):
+                        term.graphspaces[0].xRange += 1
+                    elif(val.lower() == "+"):
                         term.graphspaces[0].xRange -= 1 if term.graphspaces[0].xRange > 1 else 0
-                    elif(val.lower() == "?"):
-                        term.graphspaces[0].yRange += 1
                     elif(val.lower() == "_"):
+                        term.graphspaces[0].yRange += 1
+                    elif(val.lower() == "?"):
                         term.graphspaces[0].yRange -= 1 if term.graphspaces[0].yRange > 1 else 0
                 if(term.graphspaces[0].showMenu and val != ""):
                     term.graphspaces[0].menu.handleInput(val)
