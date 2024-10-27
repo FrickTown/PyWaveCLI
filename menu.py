@@ -133,16 +133,18 @@ class SelectionMenu(Menu):
             return self.menuEntries[self.activeIndex]
         return None
     
-    def addEntries(self, entries: list[MenuEntry]):
+    def addEntries(self, entries: list[MenuEntry], index: int = None):
         """ Add multiple entries in a list. Currently unused.
         keyword arguments:
             entries -- The list of objects of MenuEntry subclasses to be added to the menu
         """
         for entry in entries:
-            if len(self.getSelectableEntries()) == 0 and entry.selectable:
-                entry.active = True
-                self.activeIndex = len(self.menuEntries)
-            self.menuEntries.append(entry)
+            if index is None:
+                self.menuEntries.append(entry)
+            else:
+                self.menuEntries.insert(index, entry)
+        if len(self.getSelectableEntries()) != 0 and entries[-1].selectable:
+                self.selectIndex(self.menuEntries.index(entries[-1]))
         self.generateMenu()
 
     def addInfoEntry(self, info: str, color: str):
@@ -194,13 +196,19 @@ class SelectionMenu(Menu):
         self.menuEntries.append(newEntry)
         self.generateMenu()
         newEntry.createSubMenu()
+    
+    def removeEntry(self, entry: MenuEntry):
+        self.removeEntryAt(self.menuEntries.index(entry))
 
     def removeEntryAt(self, index: int):
         if index < -1 or abs(index) >= len(self.menuEntries):
             return
-        if index < self.activeIndex:
-            self.selectIndex(self.activeIndex-1)
         entry = self.menuEntries.pop(index)
+        if index > self.activeIndex or self.activeIndex == len(self.menuEntries):
+            self.selectIndex(self.activeIndex-1)
+        else:
+            self.selectIndex(self.activeIndex)
+
         self.generateMenu()
     
     def handleInput(self, keyval: keyboard.Keystroke):
@@ -222,14 +230,7 @@ class SelectionMenu(Menu):
             elif(keyname == "KEY_DOWN"):
                 self.select(1)
             elif(keyname == "KEY_ENTER"):
-                if(type(self.getSelectedEntry()) is WaveEntry):
-                    self.getSelectedEntry().openInputWindow("Edit function: ", "edit")
-                elif(type(self.getSelectedEntry()) is ArgEntry):
-                    self.getSelectedEntry().openInputWindow("Edit variable name: ", "edit")
-                elif(type(self.getSelectedEntry()) is ArgValEntry):
-                    self.getSelectedEntry().openInputWindow("", "edit")
-                self.generateMenu()
-                return
+                self.toggleSubMenu()
             elif(keyname == "KEY_BACKSPACE"):
                 if(not self.parentMenu):
                     self.graphSpace.showMenu = False
@@ -240,14 +241,31 @@ class SelectionMenu(Menu):
                     sel: WaveEntry = self.getSelectedEntry()
                     sel.wave.visible = not sel.wave.visible
                 return
+            elif(keyname == "KEY_DELETE"):
+                if(type(self.getSelectedEntry()) is WaveEntry):
+                    sel: WaveEntry = self.getSelectedEntry()
+                    self.graphSpace.removeWave(sel.wave)
+                    self.removeEntry(sel)
+                return
         
         if(keyval.lower() == "r"):
             if(type(self.getSelectedEntry()) is WaveEntry):
                 wav: WaveEntry = self.getSelectedEntry()
                 wav.wave.resetWave()
                 self.generateMenu()
+
         elif(keyval.lower() == " "):
             self.toggleSubMenu()
+            return
+        
+        elif(keyval.lower() == "e"):
+            if(type(self.getSelectedEntry()) is WaveEntry):
+                    self.getSelectedEntry().openInputWindow("Edit function: ", "edit")
+            elif(type(self.getSelectedEntry()) is ArgEntry):
+                self.getSelectedEntry().openInputWindow("Edit variable name: ", "edit")
+            elif(type(self.getSelectedEntry()) is ArgValEntry):
+                self.getSelectedEntry().openInputWindow("", "edit")
+            self.generateMenu()
             return
         elif(keyval.lower() == "n"):
             if(type(self.getSelectedEntry()) is WaveEntry): # If the currently selected entry is a Wave Entry, we're in the root menu and adding a new wave
@@ -260,9 +278,9 @@ class SelectionMenu(Menu):
             elif(type(self.parentMenu.getSelectedEntry()) is WaveEntry): # Allows adding new ArgEntries even if the containing menu is empty
                 newIndex = len(self.menuEntries)
                 parentEntry: WaveEntry = self.parentMenu.getSelectedEntry()
-                newEntry = ArgEntry(self, parentEntry.wave, "X")
-                self.addEntries([newEntry])
-                self.selectIndex(newIndex)
+                newEntry = ArgEntry(self, parentEntry.wave, "foo")
+                self.addEntries([newEntry], -2)
+                self.selectIndex(self.menuEntries.index(newEntry))
                 self.getSelectedEntry().openInputWindow("Add a new variable: ", "newVar")
                 self.generateMenu()
 
@@ -270,6 +288,12 @@ class SelectionMenu(Menu):
             if(type(self.getSelectedEntry()) is WaveEntry):
                 selected: WaveEntry = self.getSelectedEntry()
                 selected.openInputWindow("Set new RGB value. Format: 255,255,255", "color")
+
+        elif(keyval.lower() == "d"):
+            if(type(self.getSelectedEntry()) is WaveEntry):
+                selected: WaveEntry = self.getSelectedEntry()
+                self.graphSpace.addWave(selected.wave.getCopy())
+                self.generateMenu()
 
     def select(self, change: int):
         """Select a neighboring entry in the active menu
@@ -298,7 +322,8 @@ class SelectionMenu(Menu):
             return
 
         newSelection = self.menuEntries[index]
-        self.menuEntries[self.activeIndex].active = False
+        if(self.activeIndex != None and self.activeIndex <= len(self.menuEntries)-1):
+            self.menuEntries[self.activeIndex].active = False
         newSelection.active = True
         self.activeIndex = index
         self.generateMenu()
@@ -536,10 +561,12 @@ class WaveEntry(SelectableEntry):
 
     def createSubMenu(self):
         self.subMenu = SelectionMenu(self.parent.graphSpace, f"waveArgs{self.parent.getSelectableEntries().index(self)}", self.parent)
-        self.subMenu.addInfoEntry(f"Custom variables:", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
-        self.subMenu.addInfoEntry(f"", self.color)
+        #self.subMenu.addInfoEntry(f"", self.color)
+        self.subMenu.addInfoEntry(f"Custom variables:", self.parent.graphSpace.parentTerminal.color_rgb(180,180,255))
         for var in self.wave.customVars.keys():
             self.subMenu.addArgEntry(self.wave, var)
+        self.subMenu.addInfoEntry(f"", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
+        self.subMenu.addInfoEntry(f"New: (N) | Edit: (E)", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
         self.subMenu.generateMenu()
     
     def tryUpdateColor(self, input: str) -> bool:
@@ -607,21 +634,24 @@ class ArgEntry(SelectableEntry):
     
     def createSubMenu(self):
         self.subMenu = SelectionMenu(self.parent.graphSpace, f"{self.argName}-values", self.parent)
-        self.subMenu.addInfoEntry(f"Variable values of ({self.argName}):", self.parent.graphSpace.parentTerminal.color_rgb(180, 180, 225))
+        self.subMenu.addInfoEntry(f"Variable values of ({self.argName}):", self.parent.graphSpace.parentTerminal.color_rgb(180, 180, 255))
         for key in self.argRow:
             self.subMenu.addArgValEntry(self, key)
+        self.subMenu.addInfoEntry(f"", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
+        self.subMenu.addInfoEntry(f"Edit: (E)", self.parent.graphSpace.parentTerminal.color_rgb(180,180,225))
         self.subMenu.generateMenu()
 
     def onInputWindowConfirm(self, input: str, args: tuple) -> bool:
         if(len(args)):
             if(args[0] == "newVar" or args[0] == "edit"):
-                if not (input.isalpha) or len(input) < 1 or input == "x" or len(input.split(" ")) != 1: return False # Don't allow funky characters, blank, or x as variable names (messes with eval)
+                if (not (input.isalpha())) or len(input) < 1 or input == "x" or len(input.split(" ")) != 1: return False # Don't allow funky characters, blank, or x as variable names (messes with eval)
                 if(self.wave.customVars.__contains__(input)): return False
                 self.wave.customVars.update({input: self.argRow})
+                self.wave.originalVars.update({input: self.argRow})
                 if(args[0] == "edit" and self.argName != input):
                     self.wave.func = self.wave.func.replace(self.argName, input)
                     self.wave.originalFunc = self.wave.originalFunc.replace(self.argName, input)
-                    self.wave.originalVars[input] = self.wave.originalVars.pop(self.argName)
+                    self.wave.originalVars.pop(self.argName)
                     self.wave.customVars.pop(self.argName)
                 self.argName = input
                 self.wave.refreshWaveFunction()
@@ -690,5 +720,5 @@ class ArgValEntry(SelectableEntry):
 
     def openInputWindow(self, title = "", *args):
         super().openInputWindow(title, *args)
-        self.inputWindow = InputWindow(self, "Enter value for " + self.argEntry.argName + ":", "incr".center(4))
+        self.inputWindow = InputWindow(self, f"Enter {self.argKey} for ({self.argEntry.argName}):", "incr".center(4))
         self.inputWindow.setValueBuffer(list(str(self.getValue())))

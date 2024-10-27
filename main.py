@@ -90,10 +90,10 @@ class Graphspace():
         self.stepSize = stepSize
         self.clearBuffer()
         self.menu = menu.SelectionMenu(self)
-        self.menu.addInfoEntry("Navigation| Option:  (Up/Down) | Edit:    (Enter) |", parent.cadetblue1)
-        self.menu.addInfoEntry("          | Back:  (Backspace) | Submenu: (Space) |", parent.cadetblue1)
-        self.menu.addInfoEntry("Wave Menu | Toggle Wave: (Tab) | Reset Wave:  (R) |", parent.steelblue1)
-        self.menu.addInfoEntry("          | Create Wave:   (N) | Set Color:   (C) |", parent.steelblue1)
+        self.menu.addInfoEntry("   General   | Option:  (Up/Down) | Edit:        (E) |", parent.cadetblue1)
+        self.menu.addInfoEntry("   Controls: | Back:  (Backspace) | Submenu: (Enter) |", parent.cadetblue1)
+        self.menu.addInfoEntry("   Wave Menu | Toggle Wave: (Tab) | Reset Wave:  (R) | Duplicate Wave: (D) |", parent.steelblue1)
+        self.menu.addInfoEntry("   Controls: | Create Wave:   (N) | Set Color:   (C) | Delete Wave:  (Del) |", parent.steelblue1)
         self.menu.addInfoEntry("", parent.normal)
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
@@ -121,6 +121,9 @@ class Graphspace():
     
     def addWaveFromEntry(self, waveEntry: menu.WaveEntry):
         self.waves.append(waveEntry.wave)
+    
+    def removeWave(self, wave: Wave):
+        self.waves.pop(self.waves.index(wave))
 
     def clearBuffer(self):
         # Reset the graphics buffer
@@ -231,6 +234,9 @@ class Wave():
         lambdafied = lambdafied[:-1] + ":"
         self.lambdafied = lambdafied + self.func
         self.asFunction = eval(self.lambdafied)
+    
+    def getCopy(self):
+        return copy.deepcopy(self)
 
     def getFunc(self):
         return self.func()
