@@ -37,7 +37,7 @@ class TerminalSpace(Terminal):
             graphspace.clearBuffer()
 
         # Render menu info in top left corner last
-        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M] | [Quit: Q]")]
+        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M] | [Quit: Q] | [Zoom-X: (+/-)] | [Zoom-Y: (?/_)]")]
         for idx, id in enumerate(menubuffer):
             self.buffer[0][idx] = id
         
@@ -288,9 +288,18 @@ def main():
             val = keyboard.Keystroke("")
             while True:
                 deepestMenu = term.graphspaces[0].menu.recursiveSubMenuFetch()
-                if(val.lower() == "q" and not deepestMenu.inputWindowOverride): break
-                if(val.lower() == "m" and not deepestMenu.inputWindowOverride):
-                    term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
+                if(not val.name and not deepestMenu.inputWindowOverride): # If no InputWindow is currently active
+                    if(val.lower() == "q"): break
+                    elif(val.lower() == "m"):
+                        term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
+                    elif(val.lower() == "+"):
+                        term.graphspaces[0].xRange += 1
+                    elif(val.lower() == "-"):
+                        term.graphspaces[0].xRange -= 1 if term.graphspaces[0].xRange > 1 else 0
+                    elif(val.lower() == "?"):
+                        term.graphspaces[0].yRange += 1
+                    elif(val.lower() == "_"):
+                        term.graphspaces[0].yRange -= 1 if term.graphspaces[0].yRange > 1 else 0
                 if(term.graphspaces[0].showMenu and val != ""):
                     term.graphspaces[0].menu.handleInput(val)
                 if(term.graphspaces[0].showMenu and val == "" and type(deepestMenu.getSelectedEntry()) is menu.ArgValEntry):
