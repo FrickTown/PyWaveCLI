@@ -11,17 +11,35 @@ import copy
 import math
 import signal
 
-FRAMERATE = 60 # Set maximum FPS (frames per second)
+FRAMERATE = 90 # Set maximum FPS (frames per second)
+POINTSIGN = "X"
 
 class TerminalSpace(Terminal):
+    """A TerminalSpace is the context object for manipulating the terminal's cells and cursor.
+    It extends the blessed.Terminal class with PyWaveCLI specific properties and functions.
+    """
     buffer: list[list[str]] = []
     graphspaces: list[Graphspace] = []
 
     def __init__(self, kind = None, stream = None, force_styling = False):
+        """Create a new TerminalSpace object.
+
+        Args:
+            kind (_type_, optional): Defaults to None.
+            stream (_type_, optional): Defaults to None.
+            force_styling (bool, optional): Defaults to False.
+        """
         super().__init__(kind, stream, force_styling)
         self.buffer = [[" " for _ in range(self.width)] for _ in range(self.height-1)]
     
+    # TODO: Handle resizing
     def handleResize(self, sig, action):
+        """Handler for when the window is resized
+
+        Args:
+            sig (Signal): 
+            action (ActionType):
+        """
         #self.graphspaces[0].xCellCount = self.width
         #self.graphspaces[0].yCellCount = self.height
         pass
@@ -76,6 +94,12 @@ class TerminalSpace(Terminal):
     
 
 class Graphspace():
+    """GraphSpace is an object class that contains and manupulates a coordinate system.
+    It handles rendering of functions to a coordinate system.
+
+    Returns:
+        _type_: _description_
+    """
     waves: list[Wave] = []
     buffer: list[list[str]] = []
     showMenu: bool = False
@@ -98,12 +122,12 @@ class Graphspace():
 
     def cartesianToGraphspace(self, x: float, y: float) -> tuple[int, int]:
         """Convert cartesian coordinates (x, y) to a column and row cell coordinate."""
-        xStepSize = (self.xRange * 2) / self.xCellCount
-        xInCells = round(x / xStepSize)
+        cellPointWidth = (self.xRange * 2) / self.xCellCount
+        xInCells = round(x / cellPointWidth)
         xAdjusted = int(round(self.xCellCount / 2) + xInCells)
 
-        yStepSize = (self.yRange * 2)/(self.yCellCount)
-        yInCells = round(y / yStepSize)
+        cellPointHeight = (self.yRange * 2)/(self.yCellCount)
+        yInCells = round(y / cellPointHeight)
         yAdjusted = int(round((self.yCellCount / 2)) - yInCells)
 
         if (yAdjusted < 0 or yAdjusted >= self.yCellCount or xAdjusted < 0 or xAdjusted >= self.xCellCount):
@@ -155,7 +179,7 @@ class Graphspace():
             for wave in self.waves:
                 if not wave.visible: continue
                 cellPos = self.cartesianToGraphspace(x, wave.getY(x))
-                if cellPos != None: self.buffer[cellPos[1]][cellPos[0]] = f"{wave.termColor}0{self.parentTerminal.normal}"
+                if cellPos != None: self.buffer[cellPos[1]][cellPos[0]] = f"{wave.termColor}{POINTSIGN}{self.parentTerminal.normal}"
             x += self.stepSize
     
     def printUIToBuffer(self):
@@ -288,6 +312,7 @@ def main():
             val = keyboard.Keystroke("")
             while True:
                 deepestMenu = term.graphspaces[0].menu.recursiveSubMenuFetch()
+                # Root (no menu) functionality keybinds
                 if(not val.name and not deepestMenu.inputWindowOverride): # If no InputWindow is currently active
                     if(val.lower() == "q"): break
                     elif(val.lower() == "m"):
