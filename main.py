@@ -12,7 +12,7 @@ import math
 import signal
 
 FRAMERATE = 90 # Set maximum FPS (frames per second)
-POINTSIGN = "X"
+POINTSIGN = "0"
 
 class TerminalSpace(Terminal):
     """A TerminalSpace is the context object for manipulating the terminal's cells and cursor.
