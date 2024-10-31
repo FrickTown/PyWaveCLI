@@ -85,7 +85,14 @@ class SelectionMenu(Menu):
     activeIndex: int = None
     menuEntries: list[MenuEntry] = []
 
-    def __init__(self, graphSpace, name = None, parentMenu = None):
+    def __init__(self, graphSpace: main.Graphspace, name: str = None, parentMenu: Menu = None):
+        """Creates a new SelectionMenu.
+
+        Args:
+            graphSpace (GraphSpace): The GraphSpace to bind this menu to.
+            name (_type_, optional): The menu's unique identifier. Defaults to None.
+            parentMenu (_type_, optional): The menu's parent menu. Defaults to None, in which case it's a root menu.
+        """
         super().__init__(graphSpace, name, parentMenu)
         self.menuEntries = []
         if(parentMenu):
@@ -192,10 +199,10 @@ class SelectionMenu(Menu):
         newEntry.createSubMenu()
     
     def addArgValEntry(self, argEntry: ArgEntry, argKey: str):
-        """ Create and add an arg entry.
+        """ Create and add an argVal entry.
         keyword arguments:
-            wave -- The wave which will be represented by its function in the menu
-            argName -- The name of the custom variable
+            argEntry -- The MenuEntry of the custom variable
+            argKey -- The key of the variable to be represented in the menu, "value" or "incr".
         """
         newEntry = ArgValEntry(self, argEntry, argKey)
         if(len(self.getSelectableEntries()) == 0):
@@ -206,9 +213,19 @@ class SelectionMenu(Menu):
         newEntry.createSubMenu()
     
     def removeEntry(self, entry: MenuEntry):
+        """Remove entry by direct reference
+
+        Args:
+            entry (MenuEntry > *): The entry to be removed.
+        """
         self.removeEntryAt(self.menuEntries.index(entry))
 
     def removeEntryAt(self, index: int):
+        """Remove entry by index.
+
+        Args:
+            index (int): The positional index of the entry to be removed.
+        """
         if index < -1 or abs(index) >= len(self.menuEntries):
             return
         entry = self.menuEntries.pop(index)
@@ -219,7 +236,13 @@ class SelectionMenu(Menu):
 
         self.generateMenu()
     
+    # TODO: If the input concerns entries of a specific type, pass it along to that entry instead of cluttering this method.
     def handleInput(self, keyval: keyboard.Keystroke):
+        """Defines the input handling for this Menu subclass (SelectionMenu)
+
+        Args:
+            keyval (keyboard.Keystroke): The keystroke to be read and handled
+        """
         # If an input window is open, pass the input along to it
         if(self.inputWindowOverride):
             self.getSelectedEntry().inputWindow.handleInput(keyval)
@@ -326,6 +349,11 @@ class SelectionMenu(Menu):
         self.generateMenu()
     
     def selectIndex(self, index: int):
+        """Select an entry based on the positional index of it. The entry corresponding to this index must be selectable.
+
+        Args:
+            index (int): The positional index to (try to) select
+        """
         if index < 0 or index >= len(self.menuEntries) or not self.menuEntries[index].selectable:
             return
 
