@@ -55,7 +55,7 @@ class TerminalSpace(Terminal):
             graphspace.clearBuffer()
 
         # Render menu info in top left corner last
-        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M] | [Quit: Q] | [Zoom-X: (+/-)] | [Zoom-Y: (?/_)]")]
+        menubuffer = [self.underline + x + self.normal for x in list("[Menu: M] | [Quit: Q] | [Zoom-X: (+/-)] | [Zoom-Y: (?/_)] | [Adjust PPC: (K|k / L|l)]")]
         for idx, id in enumerate(menubuffer):
             self.buffer[0][idx] = id
         
@@ -105,13 +105,14 @@ class Graphspace():
     showMenu: bool = False
     menu: menu.Menu = None
 
-    def __init__(self, parent: TerminalSpace, xCellCount: int, yCellCount: int, xRange:float, yRange: float, stepSize: float):
+    def __init__(self, parent: TerminalSpace, xCellCount: int, yCellCount: int, xRange:float, yRange: float, ppcMag: int):
         self.parentTerminal = parent
         self.xCellCount = xCellCount
         self.yCellCount = yCellCount if (yCellCount % 2 != 0) else yCellCount - 1
+        self.ppcMagnitude = 0 if ppcMag < 0 else ppcMag
         self.xRange = xRange
         self.yRange = yRange
-        self.stepSize = stepSize
+        self.stepSize = 1/math.pow(2, ppcMag)
         self.clearBuffer()
         self.menu = menu.SelectionMenu(self)
         self.menu.addInfoEntry("   General   | Option:  (Up/Down) | Edit:        (E) |", parent.cadetblue1)
@@ -218,6 +219,15 @@ class Graphspace():
             self.buffer[yVal][xStart2 + x] = rangeChars[idx]
         self.buffer[yVal][xStart1-1] = '-'                              # Remember negative sign
         
+    def alterScale(self, xy: str, delta: int):
+        if(xy == "x"):
+            self.xRange += delta
+        elif(xy == "y"):
+            self.yRange += delta
+    
+    def alterPPC(self, delta: int):
+        self.ppcMagnitude += delta if self.ppcMagnitude + delta >= 0 else 0
+        self.stepSize = 1/math.pow(2, self.ppcMagnitude)
 
 class Wave():
     """ Wave Class : Contains a function f(x) and methods to evaluate it."""
@@ -310,24 +320,33 @@ def main():
 
         with term.cbreak():
             val = keyboard.Keystroke("")
+            mainGS = term.graphspaces[0]
             while True:
-                deepestMenu = term.graphspaces[0].menu.recursiveSubMenuFetch()
+                deepestMenu = mainGS.menu.recursiveSubMenuFetch()
                 # Root (no menu) functionality keybinds
                 if(not val.name and not deepestMenu.inputWindowOverride): # If no InputWindow is currently active
                     if(val.lower() == "q"): break
                     elif(val.lower() == "m"):
-                        term.graphspaces[0].showMenu = not term.graphspaces[0].showMenu
+                        mainGS.showMenu = not mainGS.showMenu
                     elif(val.lower() == "-"):
-                        term.graphspaces[0].xRange += 1
+                        mainGS.alterScale("x", 1)
                     elif(val.lower() == "+"):
-                        term.graphspaces[0].xRange -= 1 if term.graphspaces[0].xRange > 1 else 0
+                        mainGS.alterScale("x", -1 if mainGS.xRange > 1 else 0)
                     elif(val.lower() == "_"):
-                        term.graphspaces[0].yRange += 1
+                        mainGS.alterScale("y", 1)
                     elif(val.lower() == "?"):
-                        term.graphspaces[0].yRange -= 1 if term.graphspaces[0].yRange > 1 else 0
-                if(term.graphspaces[0].showMenu and val != ""):
-                    term.graphspaces[0].menu.handleInput(val)
-                if(term.graphspaces[0].showMenu and val == "" and type(deepestMenu.getSelectedEntry()) is menu.ArgValEntry):
+                        mainGS.alterScale("y", -1 if mainGS.yRange > 1 else 0)
+                    elif(val == "K"):
+                        mainGS.alterPPC(-0.1)
+                    elif(val.lower() == "k"):
+                        mainGS.alterPPC(-0.5)
+                    elif(val == "L"):
+                        mainGS.alterPPC(0.1)
+                    elif(val.lower() == "l"):
+                        mainGS.alterPPC(0.5)
+                if(mainGS.showMenu and val != ""):
+                    mainGS.menu.handleInput(val)
+                if(mainGS.showMenu and val == "" and type(deepestMenu.getSelectedEntry()) is menu.ArgValEntry):
                     deepestMenu.generateMenu()
 
                 term.render()
