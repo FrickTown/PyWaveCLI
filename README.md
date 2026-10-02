@@ -46,7 +46,7 @@ Additionally, you can adjust the *PPC* or the *points per cell* value, essential
 
 ##  Troubleshooting
 ### IndexError: list assignment index out of range
-If you see this error when trying to run the program, **widen your terminal window**.
+If you see this error when trying to run the program, **widen or scale down your terminal window**.
 The application needs a minimum of **85** columns to start, and **152** columns to render the user interface properly. Handling this without crashing is a future addition.
 
 ## Special thanks:
